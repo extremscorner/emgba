@@ -20,9 +20,9 @@ BUILD		:=	build
 SOURCES		:=	source \
 				source/vm
 DATA		:=	data
-INCLUDES	:=	../../mgba/src \
-				../../mgba/src/arm \
-				../../mgba/include
+INCLUDES	:=	mgba/src \
+				mgba/src/arm \
+				mgba/include
 
 #---------------------------------------------------------------------------------
 # options for code generation
@@ -91,7 +91,7 @@ export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
 # build a list of library paths
 #---------------------------------------------------------------------------------
 export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib) \
-					$(CURDIR)/../../mgba/libmgba.a
+					$(CURDIR)/mgba/libmgba.a
 
 export OUTPUT	:=	$(CURDIR)/$(TARGET)
 .PHONY: $(BUILD) clean
