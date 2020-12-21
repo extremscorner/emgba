@@ -1,0 +1,32 @@
+Name={--aspect, Aspect Ratio}
+Values={3:2, 3:2}, {4:3, 4:3}, {5:4, 5:4}, {16:9, 16:9}, {16:10, 16:10}
+
+Name={--format, Video Format}
+Values={ntsc, NTSC}, {pal, PAL}, {pal-m, PAL-M}, {ntsc-50, NTSC-50}, {pal-60, PAL-60}, {custom, Custom}, {custom-m, Custom-M}, {hd60, HD60}
+
+Name={--scan-mode, Video Mode}
+Values={interlace, 480i60}, {interlace clock2x no-size2x, 480i120}, {quasi-interlace, 480sf30}, {non-interlace, 240p60}, {non-interlace clock2x no-size2x, 240p120}, {non-progressive, 960i60}, {progressive, 480p60}
+
+Name={--scan-mode, Video Oversampling}
+Values={no-clock2x no-size2x, No}, {clock2x size2x, Yes}
+
+Name={--poll, Polling Rate}
+Values={1, 1000Hz}, {2, 500Hz}, {3, 350Hz}, {4, 300Hz}, {5, 250Hz}, {6, 200Hz}, {7, 150Hz}, {0, VSync}
+
+Name={--overlay-id, Border}
+Values={0, 01}, {1, 02}, {2, 03}, {3, 04}, {4, 05}, {5, 06}, {6, 07}, {7, 08}
+
+Name={--filter, Filter}
+Values={none, Sharp}, {blend, Soft}, {deflicker, Normal}, {scale2xex, Scale2×Ex}, {scale2xplus, Scale2×Plus}, {scale2x, Scale2×}, {eagle2x, Eagle2×}, {scan2x, Scan2×}
+
+Name={--matrix, Color Matrix}
+Values={identity, Identity}, {gba, GBA}, {gbc, GBC}, {gbi, GBI}, {nds, NDS}, {palm, Palm}, {psp, PSP}, {vba, VBA}
+
+Name={--input-gamma, Decoding Gamma}
+Values={1.0, 1.0}, {1.2, 1.2}, {1.4, 1.4}, {1.6, 1.6}, {1.8, 1.8}, {2.0, 2.0}, {2.2, 2.2}, {2.4, 2.4}
+
+Name={--output-gamma, Encoding Gamma}
+Values={1.0, 1.0}, {1.7, 1.7}, {2.2, 2.2}
+
+Name={--contrast, Contrast}
+Values={0.5, 50%}, {0.6, 60%}, {0.65, 65%}, {0.7, 70%}, {0.75, 75%}, {0.78125, 78.125%}, {1.0, 100%}, {1.1, 110%}

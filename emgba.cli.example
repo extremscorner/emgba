@@ -1,0 +1,9 @@
+--aspect=4:3
+--cursor=point-srgb.tpl.gz
+--overlay=frame-srgb.tpl.gz
+--dither=none
+--matrix=identity
+--input-gamma=1.
+--output-gamma=1.
+--contrast=.78125
+--
