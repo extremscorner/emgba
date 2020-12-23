@@ -1567,8 +1567,6 @@ static void preinit(int argc, char **argv)
 					state.matrix = MATRIX_IDENTITY;
 				else if (strcmp(optarg, "gba") == 0)
 					state.matrix = MATRIX_GBA;
-				else if (strcmp(optarg, "gbc") == 0)
-					state.matrix = MATRIX_GBC;
 				else if (strcmp(optarg, "gbi") == 0)
 					state.matrix = MATRIX_GBI;
 				else if (strcmp(optarg, "nds") == 0)

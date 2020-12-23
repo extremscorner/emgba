@@ -73,7 +73,6 @@ typedef struct {
 	enum {
 		MATRIX_IDENTITY = 0,
 		MATRIX_GBA,
-		MATRIX_GBC,
 		MATRIX_GBI,
 		MATRIX_NDS,
 		MATRIX_PALM,
