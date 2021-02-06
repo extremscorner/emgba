@@ -1,3 +1,4 @@
 [submodule "mgba"]
 	path = mgba
 	url = https://github.com/extremscorner/mgba.git
+	shallow = true
