@@ -1,6 +1,6 @@
 /* 
- * Copyright (c) 2015-2020, Extrems' Corner.org
- *
+ * Copyright (c) 2015-2021, Extrems' Corner.org
+ * 
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
@@ -1270,7 +1270,7 @@ static void preinit(int argc, char **argv)
 	for (int chn = 0; chn < EXI_CHANNEL_2; chn++)
 		CON_EnableGecko(chn, FALSE);
 
-	puts("Enhanced mGBA © 2015-2020 Extrems' Corner.org");
+	puts("Enhanced mGBA © 2015-2021 Extrems' Corner.org");
 
 	if (fatInitDefault()) {
 		mkdir("/mGBA", 0755);
