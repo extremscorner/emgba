@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2015-2021, Extrems' Corner.org
+ * Copyright (c) 2015-2022, Extrems' Corner.org
  * 
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -51,7 +51,9 @@ static void GXFontDrawCell(int16_t x1, int16_t y1, uint32_t c, int16_t s1, int16
 void GXFontAllocState(void)
 {
 	Mtx44 projection;
-	guOrtho(projection, -screen.h / 2, screen.h / 2, -screen.w / 2, screen.w / 2, 0., 1.);
+	guOrtho(projection,
+		-screen.y - screen.h / 2, screen.y + screen.h / 2,
+		-screen.x - screen.w / 2, screen.x + screen.w / 2, 0., 1.);
 
 	if (SYS_SetFontEncoding(SYS_FONTENC_ANSI) == SYS_FONTENC_ANSI)
 		fontdata = SYS_AllocArenaMemHi(SYS_FONTSIZE_ANSI, 32);
@@ -59,7 +61,9 @@ void GXFontAllocState(void)
 		fontdata = SYS_AllocArenaMemHi(SYS_FONTSIZE_SJIS, 32);
 
 	SYS_InitFont(fontdata);
-	GX_InitTexObj(&texobj, (void *)fontdata + fontdata->sheet_image + 16,
+	fontdata->sheet_image = (fontdata->sheet_image + 31) & ~31;
+
+	GX_InitTexObj(&texobj, (void *)fontdata + fontdata->sheet_image,
 		fontdata->sheet_width, fontdata->sheet_height,
 		fontdata->sheet_format, GX_CLAMP, GX_CLAMP, GX_FALSE);
 	GX_InitTexObjLOD(&texobj, GX_LINEAR, GX_LINEAR, 0., 0., 0., GX_TRUE, GX_TRUE, GX_ANISO_4);
@@ -131,7 +135,7 @@ void GUIFontIconMetrics(const struct GUIFont *font, enum GUIIcon icon, unsigned 
 	if (h) *h = 0;
 }
 
-void GUIFontDrawGlyph(const struct GUIFont *font, int x, int y, uint32_t color, uint32_t glyph)
+void GUIFontDrawGlyph(struct GUIFont *font, int x, int y, uint32_t color, uint32_t glyph)
 {
 	void *image;
 	int32_t xpos, ypos, width;
@@ -143,10 +147,10 @@ void GUIFontDrawGlyph(const struct GUIFont *font, int x, int y, uint32_t color, 
 	GXFontDrawCell(x, y, color, xpos, ypos);
 }
 
-void GUIFontDrawIcon(const struct GUIFont *font, int x, int y, enum GUIAlignment align, enum GUIOrientation orient, uint32_t color, enum GUIIcon icon)
+void GUIFontDrawIcon(struct GUIFont *font, int x, int y, enum GUIAlignment align, enum GUIOrientation orient, uint32_t color, enum GUIIcon icon)
 {
 }
 
-void GUIFontDrawIconSize(const struct GUIFont *font, int x, int y, int w, int h, uint32_t color, enum GUIIcon icon)
+void GUIFontDrawIconSize(struct GUIFont *font, int x, int y, int w, int h, uint32_t color, enum GUIIcon icon)
 {
 }

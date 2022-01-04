@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2015-2021, Extrems' Corner.org
+ * Copyright (c) 2015-2022, Extrems' Corner.org
  * 
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -127,6 +127,9 @@ void VideoSetup(uint32_t tvMode, uint32_t viMode, uint32_t xfbMode)
 		case VI_HD48:
 		case VI_HD50:
 		case VI_HD60:
+			screen.x = 0;
+			screen.y = 0;
+
 			if (state.aspect.h > state.aspect.w) {
 				screen.w = 540;
 				screen.h = 540 * state.aspect.h / state.aspect.w;
@@ -137,6 +140,9 @@ void VideoSetup(uint32_t tvMode, uint32_t viMode, uint32_t xfbMode)
 			break;
 		case VI_DEBUG_PAL:
 		case VI_PAL:
+			screen.x = 0;
+			screen.y = 0;
+
 			if (state.aspect.h > state.aspect.w) {
 				screen.w = 576;
 				screen.h = 576 * state.aspect.h / state.aspect.w;
@@ -146,12 +152,15 @@ void VideoSetup(uint32_t tvMode, uint32_t viMode, uint32_t xfbMode)
 			}
 			break;
 		default:
+			screen.x = 0;
+			screen.y = 3;
+
 			if (state.aspect.h > state.aspect.w) {
 				screen.w = 480;
-				screen.h = 486 * state.aspect.h / state.aspect.w;
+				screen.h = 480 * state.aspect.h / state.aspect.w;
 			} else {
 				screen.w = 480 * state.aspect.w / state.aspect.h;
-				screen.h = 486;
+				screen.h = 480;
 			}
 	}
 

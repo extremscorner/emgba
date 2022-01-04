@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2015-2021, Extrems' Corner.org
+ * Copyright (c) 2015-2022, Extrems' Corner.org
  * 
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -12,6 +12,7 @@
 #include "gba.h"
 #include "gba_mb.h"
 #include "input.h"
+#include "state.h"
 
 static lwpq_t queue = LWP_TQUEUE_NULL;
 static lwp_t thread = LWP_THREAD_NULL;
@@ -21,7 +22,7 @@ static void transfer_cb(int32_t chan, uint32_t type)
 	LWP_ThreadSignal(queue);
 }
 
-uint32_t GBAJoyResetCommand(int32_t chan)
+uint32_t GBAResetCommand(int32_t chan)
 {
 	uint32_t level;
 	uint8_t outbuf[1] = {0xFF};
@@ -37,7 +38,7 @@ uint32_t GBAJoyResetCommand(int32_t chan)
 	return inbuf[0] << 24 | inbuf[1] << 16 | inbuf[2] << 8;
 }
 
-uint32_t GBAJoyStatusCommand(int32_t chan)
+uint32_t GBAStatusCommand(int32_t chan)
 {
 	uint32_t level;
 	uint8_t outbuf[1] = {0x00};
@@ -53,7 +54,7 @@ uint32_t GBAJoyStatusCommand(int32_t chan)
 	return inbuf[0] << 24 | inbuf[1] << 16 | inbuf[2] << 8;
 }
 
-uint32_t GBAJoyReadCommand(int32_t chan)
+uint32_t GBAReadCommand(int32_t chan)
 {
 	uint32_t level;
 	uint8_t outbuf[1] = {0x14};
@@ -69,7 +70,7 @@ uint32_t GBAJoyReadCommand(int32_t chan)
 	return inbuf[3] << 24 | inbuf[2] << 16 | inbuf[1] << 8 | inbuf[0];
 }
 
-void GBAJoyWriteCommand(int32_t chan, uint32_t val)
+void GBAWriteCommand(int32_t chan, uint32_t val)
 {
 	uint32_t level;
 	uint8_t outbuf[5] = {0x15, val, val >> 8, val >> 16, val >> 24};
@@ -83,7 +84,7 @@ void GBAJoyWriteCommand(int32_t chan, uint32_t val)
 	_CPU_ISR_Restore(level);
 }
 
-uint32_t GBAJoyChecksum(uint32_t crc, uint32_t val)
+static uint32_t GBAChecksum(uint32_t crc, uint32_t val)
 {
 	crc ^= val;
 
@@ -93,7 +94,7 @@ uint32_t GBAJoyChecksum(uint32_t crc, uint32_t val)
 	return crc;
 }
 
-uint32_t GBAJoyEncrypt(uint32_t addr, uint32_t val, uint32_t *key)
+static uint32_t GBAEncrypt(uint32_t addr, uint32_t val, uint32_t *key)
 {
 	*key = *key * bswap32('Kawa') + 1;
 	val ^= *key;
@@ -102,7 +103,7 @@ uint32_t GBAJoyEncrypt(uint32_t addr, uint32_t val, uint32_t *key)
 	return val;
 }
 
-uint32_t GBAJoyGetKey(uint32_t size)
+static uint32_t GBAGetKey(uint32_t size)
 {
 	uint32_t key;
 	key  = (size - 0x200) >> 3;
@@ -133,37 +134,41 @@ static void *thread_func(void *arg)
 					if (gc_steering.status[chan].err == SI_STEERING_ERR_NO_CONTROLLER)
 						gc_steering.status[chan].err =  SI_ResetSteering(chan);
 					break;
+				case SI_N64_CONTROLLER:
+					N64_ReadAsync(chan, &n64_controller.status[chan], NULL);
+					break;
 				case SI_GBA:
-					type = GBAJoyResetCommand(chan);
-					type = GBAJoyStatusCommand(chan);
+					type = GBAResetCommand(chan);
+					type = GBAStatusCommand(chan);
 
 					if ((type & 0x3000) == 0x1000) {
 						uint32_t off, size = gba_mb_size < 0x200 ? 0x200 : (gba_mb_size + 7) & ~7;
 						uint32_t crc = 0x15A0, key = bswap32('sedo'), val;
 
-						key ^= GBAJoyReadCommand(chan);
-						GBAJoyWriteCommand(chan, GBAJoyGetKey(size));
+						key ^= GBAReadCommand(chan);
+						GBAWriteCommand(chan, GBAGetKey(size));
 
 						for (off = 0; off < 0xC0; off += 4) {
 							val = __lwbrx(gba_mb, off);
-							GBAJoyWriteCommand(chan, val);
+							GBAWriteCommand(chan, val);
 						}
 
 						for (off = 0xC0; off < size; off += 4) {
 							val = __lwbrx(gba_mb, off);
-							crc = GBAJoyChecksum(crc, val);
-							val = GBAJoyEncrypt(0x02000000 + off, val, &key);
-							GBAJoyWriteCommand(chan, val);
+							crc = GBAChecksum(crc, val);
+							val = GBAEncrypt(0x02000000 + off, val, &key);
+							GBAWriteCommand(chan, val);
 						}
 
 						crc |= size << 16;
-						crc  = GBAJoyEncrypt(0x02000000 + off, crc, &key);
-						GBAJoyWriteCommand(chan, crc);
-						GBAJoyReadCommand(chan);
+						crc  = GBAEncrypt(0x02000000 + off, crc, &key);
+						GBAWriteCommand(chan, crc);
+						GBAReadCommand(chan);
 					}
 				default:
 					gc_controller.status[chan].err = PAD_ERR_NO_CONTROLLER;
 					gc_steering.status[chan].err = SI_STEERING_ERR_NO_CONTROLLER;
+					n64_controller.status[chan].err = N64_ERR_NO_CONTROLLER;
 					break;
 			}
 		}
@@ -175,7 +180,7 @@ static void *thread_func(void *arg)
 	return NULL;
 }
 
-void GBAJoyInit(void)
+void GBAInit(void)
 {
 	LWP_InitQueue(&queue);
 	LWP_CreateThread(&thread, thread_func, NULL, NULL, 0, LWP_PRIO_NORMAL);

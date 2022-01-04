@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2015-2021, Extrems' Corner.org
+ * Copyright (c) 2015-2022, Extrems' Corner.org
  * 
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -399,15 +399,17 @@ void *GXOpenFile(const char *file)
 
 rect_t GXReadRect(void)
 {
-	rect_t rect;
+	rect_t rect = {0};
 	uint16_t top, bottom, left, right;
 
 	GX_ReadBoundingBox(&top, &bottom, &left, &right);
 
-	rect.x = viewport.x + left;
-	rect.y = viewport.y + top;
-	rect.w = right - left + 1;
-	rect.h = bottom - top + 1;
+	if (top < bottom && left < right) {
+		rect.x = viewport.x + left;
+		rect.y = viewport.y + top;
+		rect.w = right - left + 1;
+		rect.h = bottom - top + 1;
+	}
 
 	return rect;
 }

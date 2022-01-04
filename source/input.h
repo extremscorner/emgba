@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2015-2021, Extrems' Corner.org
+ * Copyright (c) 2015-2022, Extrems' Corner.org
  * 
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -14,7 +14,6 @@
 #include <ogc/pad.h>
 #include <ogc/si.h>
 #include <ogc/si_steering.h>
-#include "state.h"
 
 #define MAT_BUTTON_MINUS         PAD_BUTTON_LEFT
 #define MAT_BUTTON_BLUE_DOWN     PAD_BUTTON_RIGHT

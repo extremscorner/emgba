@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2015-2021, Extrems' Corner.org
+ * Copyright (c) 2015-2022, Extrems' Corner.org
  * 
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -35,7 +35,9 @@ void GXSolidDrawRect(rect_t rect, uint32_t color[4])
 void GXSolidAllocState(void)
 {
 	Mtx44 projection;
-	guOrtho(projection, 0., screen.h, 0., screen.w, 0., 1.);
+	guOrtho(projection,
+		-screen.y, screen.y + screen.h,
+		-screen.x, screen.x + screen.w, 0., 1.);
 
 	displist = GXAllocBuffer(GX_FIFO_MINSIZE);
 	GX_BeginDispList(displist, GX_FIFO_MINSIZE);

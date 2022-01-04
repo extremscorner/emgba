@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2015-2021, Extrems' Corner.org
+ * Copyright (c) 2015-2022, Extrems' Corner.org
  * 
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -15,6 +15,7 @@
 #include <math.h>
 #include <gccore.h>
 #include <ogc/lwp_watchdog.h>
+#include <ogc/machine/processor.h>
 #include <asndlib.h>
 #include <wiiuse/wpad.h>
 #include <fat.h>
@@ -52,6 +53,8 @@ state_t default_state, state = {
 	.draw_wait     = true,
 	.aspect        = { 4., 3. },
 	.zoom          = { 2., 2. },
+	.zoom_auto     = true,
+	.zoom_ratio    = .75,
 	.scale         = 1,
 	.poll          = 1,
 	.cursor        = "point.tpl.gz",
@@ -362,12 +365,7 @@ static void _guiPrepare(void)
 {
 	GX_BeginDispList(displist[2], GX_FIFO_MINSIZE);
 
-	GX_SetViewportJitter(
-		viewport.x + state.offset.x,
-		viewport.y + state.offset.y,
-		viewport.w,
-		viewport.h,
-		0., 1.,
+	GX_SetViewportJitter(viewport.x + state.offset.x, viewport.y + state.offset.y, viewport.w, viewport.h, 0., 1.,
 		rmode.field_rendering ? state.field : viewport.h % 2);
 
 	Mtx viewmodel;
@@ -397,22 +395,29 @@ static void _guiFinish(void)
 	dispsize[3] = GX_EndDispList();
 }
 
-static struct GBAStereoSample audio_frame[2][1024] ATTRIBUTE_ALIGN(32);
+static struct GBAStereoSample audio_frame[2][16384] ATTRIBUTE_ALIGN(32);
 static unsigned audio_index;
 
 static void _postAudioBuffer(struct mAVStream *stream, blip_t *left, blip_t *right)
 {
-	if (ASND_TestVoiceBufferReady(0) == SND_OK || !state.draw_wait) {
-		blip_read_samples(right, &audio_frame[audio_index][0].left, 1024, true);
-		blip_read_samples(left, &audio_frame[audio_index][0].right, 1024, true);
+	uint32_t level;
+
+	if (ASND_TestVoiceBufferReady(0) == SND_OK) {
+		int avail = blip_samples_avail(left) & ~(1024 - 1);
+		blip_read_samples(right, &audio_frame[audio_index][0].left, avail, true);
+		blip_read_samples(left, &audio_frame[audio_index][0].right, avail, true);
+
+		_CPU_ISR_Disable(level);
 
 		if (ASND_StatusVoice(0) == SND_UNUSED) {
-			if (ASND_SetVoice(0, VOICE_STEREO_16BIT, 48000, 0, audio_frame[audio_index], SND_BUFFERSIZE, MAX_VOLUME, MAX_VOLUME, NULL) == SND_OK)
+			if (ASND_SetVoice(0, VOICE_STEREO_16BIT, 48000, 0, audio_frame[audio_index], avail * 4, MAX_VOLUME, MAX_VOLUME, NULL) == SND_OK)
 				audio_index ^= 1;
 		} else {
-			if (ASND_AddVoice(0, audio_frame[audio_index], SND_BUFFERSIZE) == SND_OK)
+			if (ASND_AddVoice(0, audio_frame[audio_index], avail * 4) == SND_OK)
 				audio_index ^= 1;
 		}
+
+		_CPU_ISR_Restore(level);
 	}
 }
 
@@ -521,7 +526,21 @@ static void _updateScreenMode(struct GUIParams *params, unsigned mode)
 			break;
 		}
 		default:
-			state.zoom = default_state.zoom;
+		{
+			float dst[2] = {screen.w * state.zoom_ratio, screen.h * state.zoom_ratio};
+			float src[2] = {GBA_VIDEO_HORIZONTAL_PIXELS, GBA_VIDEO_VERTICAL_PIXELS};
+
+			if (state.zoom_auto) {
+				if (dst[0] / dst[1] < src[0] / src[1]) {
+					state.zoom.x = 
+					state.zoom.y = dst[0] / src[0];
+				} else {
+					state.zoom.x = 
+					state.zoom.y = dst[1] / src[1];
+				}
+			} else
+				state.zoom = default_state.zoom;
+		}
 	}
 
 	params->width = GBA_VIDEO_HORIZONTAL_PIXELS * state.zoom.x;
@@ -712,7 +731,7 @@ static void _gameLoaded(struct mGUIRunner *runner)
 	else GXAllocSurface(&prescale_surface, width * state.scale, height * state.scale, GX_TF_I8, 3);
 	GXSetSurfaceFilt(&prescale_surface, state.scaler == SCALER_NEAREST ? GX_NEAR : GX_LINEAR);
 
-	runner->core->setAudioBufferSize(runner->core, 1024);
+	runner->core->setAudioBufferSize(runner->core, 1024 * 2);
 
 	runner->core->setAVStream(runner->core, &stream);
 
@@ -973,12 +992,7 @@ static void _drawFrame(struct mGUIRunner *runner, bool faded)
 
 	GX_BeginDispList(displist[0], GX_FIFO_MINSIZE);
 
-	GX_SetViewportJitter(
-		viewport.x + state.offset.x,
-		viewport.y + state.offset.y,
-		viewport.w,
-		viewport.h,
-		0., 1.,
+	GX_SetViewportJitter(viewport.x + state.offset.x, viewport.y + state.offset.y, viewport.w, viewport.h, 0., 1.,
 		rmode.field_rendering ? state.field : viewport.h % 2);
 
 	GXPreviewDrawRect(prescale_surface.obj, convert_surface.rect, prescale_surface.rect);
@@ -1068,12 +1082,7 @@ static void _drawScreenshot(struct mGUIRunner *runner, const color_t *pixels, un
 
 	GX_BeginDispList(displist[0], GX_FIFO_MINSIZE);
 
-	GX_SetViewportJitter(
-		viewport.x + state.offset.x,
-		viewport.y + state.offset.y,
-		viewport.w,
-		viewport.h,
-		0., 1.,
+	GX_SetViewportJitter(viewport.x + state.offset.x, viewport.y + state.offset.y, viewport.w, viewport.h, 0., 1.,
 		rmode.field_rendering ? state.field : viewport.h % 2);
 
 	GXPreviewDrawRect(prescale_surface.obj, convert_surface.rect, prescale_surface.rect);
@@ -1102,18 +1111,18 @@ static void _unpaused(struct mGUIRunner *runner)
 {
 	unsigned mode;
 	float fps, sampleRate;
-	int sync, interframeBlending;
+	bool sync, interframeBlending;
 
 	state.draw_osd = false;
 
 	if (mCoreConfigGetUIntValue(&runner->config, "screenMode", &mode))
 		_updateScreenMode(&runner->params, mode);
 
-	if (mCoreConfigGetIntValue(&runner->config, "interframeBlending", &interframeBlending))
+	if (mCoreConfigGetBoolValue(&runner->config, "interframeBlending", &interframeBlending))
 		if (state.filter < FILTER_DEFLICKER)
 			state.filter = interframeBlending;
 
-	if (mCoreConfigGetIntValue(&runner->config, "videoSync", &sync) && !sync) {
+	if (mCoreConfigGetBoolValue(&runner->config, "videoSync", &sync) && !sync) {
 		if (mCoreConfigGetFloatValue(&runner->config, "fpsTarget", &fps)) {
 			struct timespec tv;
 
@@ -1270,7 +1279,7 @@ static void preinit(int argc, char **argv)
 	for (int chn = 0; chn < EXI_CHANNEL_2; chn++)
 		CON_EnableGecko(chn, FALSE);
 
-	puts("Enhanced mGBA © 2015-2021 Extrems' Corner.org");
+	puts("Enhanced mGBA © 2015-2022 Extrems' Corner.org");
 
 	if (fatInitDefault()) {
 		mkdir("/mGBA", 0755);
@@ -1316,20 +1325,19 @@ static void preinit(int argc, char **argv)
 		case CONF_ASPECT_4_3:
 			VIDEO_SetAspectRatio(VI_DISPLAY_GAMEPAD, VI_ASPECT_3_4);
 			VIDEO_SetAspectRatio(VI_DISPLAY_TV,      VI_ASPECT_1_1);
-			state.aspect.w = 4;
-			state.aspect.h = 3;
+			state.aspect.w = 4.;
+			state.aspect.h = 3.;
 			break;
 		case CONF_ASPECT_16_9:
 			VIDEO_SetAspectRatio(VI_DISPLAY_BOTH, VI_ASPECT_1_1);
-			state.aspect.w = 16;
-			state.aspect.h = 9;
+			state.aspect.w = 16.;
+			state.aspect.h = 9.;
 			break;
 	}
 	#endif
 
 	state.offset.x = SYSCONF_GetDisplayOffsetH();
-	state.zoom.x = 
-	state.zoom.y = GBPGetScreenSize() ? 2.375 : 2.;
+	state.zoom_ratio = GBPGetScreenSize() ? .875 : .75;
 	state.overlay_id = GBPGetFrame();
 	state.filter = GBPGetScreenFilter();
 
@@ -1337,6 +1345,7 @@ static void preinit(int argc, char **argv)
 		OPT_ASPECT = 0x80,
 		OPT_OFFSET,
 		OPT_ZOOM,
+		OPT_ZOOM_AUTO,
 		OPT_ROTATE,
 		OPT_POLL,
 		OPT_CURSOR,
@@ -1349,10 +1358,11 @@ static void preinit(int argc, char **argv)
 		OPT_DITHER,
 		OPT_SCALER,
 		OPT_MATRIX,
+		OPT_PROFILE,
 		OPT_INPUT_GAMMA,
 		OPT_OUTPUT_GAMMA,
-		OPT_CONTRAST,
 		OPT_BRIGHTNESS,
+		OPT_CONTRAST,
 		OPT_FORMAT,
 		OPT_SCAN_MODE,
 		OPT_IPV4_ADDRESS,
@@ -1366,6 +1376,7 @@ static void preinit(int argc, char **argv)
 		{ "aspect",        required_argument, NULL, OPT_ASPECT        },
 		{ "offset",        required_argument, NULL, OPT_OFFSET        },
 		{ "zoom",          required_argument, NULL, OPT_ZOOM          },
+		{ "zoom-auto",     optional_argument, NULL, OPT_ZOOM_AUTO     },
 		{ "rotate",        required_argument, NULL, OPT_ROTATE        },
 		{ "poll",          required_argument, NULL, OPT_POLL          },
 		{ "cursor",        required_argument, NULL, OPT_CURSOR        },
@@ -1378,10 +1389,11 @@ static void preinit(int argc, char **argv)
 		{ "dither",        required_argument, NULL, OPT_DITHER        },
 		{ "scaler",        required_argument, NULL, OPT_SCALER        },
 		{ "matrix",        required_argument, NULL, OPT_MATRIX        },
+		{ "profile",       required_argument, NULL, OPT_PROFILE       },
 		{ "input-gamma",   required_argument, NULL, OPT_INPUT_GAMMA   },
 		{ "output-gamma",  required_argument, NULL, OPT_OUTPUT_GAMMA  },
-		{ "contrast",      required_argument, NULL, OPT_CONTRAST      },
 		{ "brightness",    required_argument, NULL, OPT_BRIGHTNESS    },
+		{ "contrast",      required_argument, NULL, OPT_CONTRAST      },
 		{ "format",        required_argument, NULL, OPT_FORMAT        },
 		{ "scan-mode",     required_argument, NULL, OPT_SCAN_MODE     },
 		{ "ipv4-address",  required_argument, NULL, OPT_IPV4_ADDRESS  },
@@ -1412,7 +1424,13 @@ static void preinit(int argc, char **argv)
 				switch (sscanf(optarg, "%g:%g",
 							&state.zoom.x, &state.zoom.y)) {
 					case 1: state.zoom.y = state.zoom.x;
+					case 2: state.zoom_auto = false;
 				}
+				break;
+			case OPT_ZOOM_AUTO:
+				if (optarg)
+					state.zoom_ratio = strtod(optarg, NULL);
+				state.zoom_auto = true;
 				break;
 			case OPT_ROTATE:
 				state.rotation = strtod(optarg, NULL);
@@ -1567,6 +1585,10 @@ static void preinit(int argc, char **argv)
 					state.matrix = MATRIX_IDENTITY;
 				else if (strcmp(optarg, "gba") == 0)
 					state.matrix = MATRIX_GBA;
+				else if (strcmp(optarg, "gbc") == 0)
+					state.matrix = MATRIX_GBC;
+				else if (strcmp(optarg, "gbc-dev") == 0)
+					state.matrix = MATRIX_GBC_DEV;
 				else if (strcmp(optarg, "gbi") == 0)
 					state.matrix = MATRIX_GBI;
 				else if (strcmp(optarg, "nds") == 0)
@@ -1577,6 +1599,113 @@ static void preinit(int argc, char **argv)
 					state.matrix = MATRIX_PSP;
 				else if (strcmp(optarg, "vba") == 0)
 					state.matrix = MATRIX_VBA;
+				break;
+			case OPT_PROFILE:
+				if (strcmp(optarg, "srgb") == 0) {
+					state.matrix = MATRIX_IDENTITY;
+					state.input_trc = TRC_GAMMA;
+					state.input_gamma[0] = 
+					state.input_gamma[1] = 
+					state.input_gamma[2] = 2.2;
+					state.output_gamma = 2.2;
+					state.brightness[0] = 
+					state.brightness[1] = 
+					state.brightness[2] = 0.;
+					state.contrast[0] = 
+					state.contrast[1] = 
+					state.contrast[2] = 1.;
+				} else if (strcmp(optarg, "gba") == 0) {
+					state.matrix = MATRIX_GBA;
+					state.input_trc = TRC_GAMMA;
+					state.input_gamma[0] = 
+					state.input_gamma[1] = 
+					state.input_gamma[2] = 4.;
+					state.output_gamma = 2.2;
+					state.brightness[0] = 
+					state.brightness[1] = 
+					state.brightness[2] = powf(1./250., 1./4.);
+					state.contrast[0] = 
+					state.contrast[1] = 
+					state.contrast[2] = 1. - state.brightness[0];
+				} else if (strcmp(optarg, "gbc") == 0) {
+					state.matrix = MATRIX_GBC;
+					state.input_trc = TRC_GAMMA;
+					state.input_gamma[0] = 
+					state.input_gamma[1] = 
+					state.input_gamma[2] = 2.2;
+					state.output_gamma = 2.2;
+					state.brightness[0] = 
+					state.brightness[1] = 
+					state.brightness[2] = powf(1./75., 1./2.2);
+					state.contrast[0] = 
+					state.contrast[1] = 
+					state.contrast[2] = 1. - state.brightness[0];
+				} else if (strcmp(optarg, "gbc-dev") == 0) {
+					state.matrix = MATRIX_GBC_DEV;
+					state.input_trc = TRC_GAMMA;
+					state.input_gamma[0] = 
+					state.input_gamma[1] = 
+					state.input_gamma[2] = 1.;
+					state.output_gamma = 1.7;
+					state.brightness[0] = 
+					state.brightness[1] = 
+					state.brightness[2] = 0.;
+					state.contrast[0] = 
+					state.contrast[1] = 
+					state.contrast[2] = 1.12;
+				} else if (strcmp(optarg, "gbi") == 0) {
+					state.matrix = MATRIX_GBI;
+					state.input_trc = TRC_SMPTE240;
+					state.input_gamma[0] = 
+					state.input_gamma[1] = 
+					state.input_gamma[2] = 2.2;
+					state.output_gamma = 2.2;
+					state.brightness[0] = 
+					state.brightness[1] = 
+					state.brightness[2] = 0.;
+					state.contrast[0] = 
+					state.contrast[1] = 
+					state.contrast[2] = 1.;
+				} else if (strcmp(optarg, "nds") == 0) {
+					state.matrix = MATRIX_NDS;
+					state.input_trc = TRC_GAMMA;
+					state.input_gamma[0] = 
+					state.input_gamma[1] = 
+					state.input_gamma[2] = 2.2;
+					state.output_gamma = 2.2;
+					state.brightness[0] = 
+					state.brightness[1] = 
+					state.brightness[2] = powf(1./600., 1./2.2);
+					state.contrast[0] = 
+					state.contrast[1] = 
+					state.contrast[2] = 1. - state.brightness[0];
+				} else if (strcmp(optarg, "palm") == 0) {
+					state.matrix = MATRIX_PALM;
+					state.input_trc = TRC_GAMMA;
+					state.input_gamma[0] = 
+					state.input_gamma[1] = 
+					state.input_gamma[2] = 2.2;
+					state.output_gamma = 2.2;
+					state.brightness[0] = 
+					state.brightness[1] = 
+					state.brightness[2] = powf(1./75., 1./2.2);
+					state.contrast[0] = 
+					state.contrast[1] = 
+					state.contrast[2] = 1. - state.brightness[0];
+				} else if (strcmp(optarg, "psp") == 0) {
+					state.matrix = MATRIX_PSP;
+					state.input_trc = TRC_GAMMA;
+					state.input_gamma[0] = 
+					state.input_gamma[1] = 
+					state.input_gamma[2] = 2.2;
+					state.output_gamma = 2.2;
+					state.brightness[0] = 
+					state.brightness[1] = 
+					state.brightness[2] = powf(1./750., 1./2.2);
+					state.contrast[0] = 
+					state.contrast[1] = 
+					state.contrast[2] = 1. - state.brightness[0];
+				}
 				break;
 			case OPT_INPUT_GAMMA:
 				switch (sscanf(optarg, "%g:%g:%g",
@@ -1589,18 +1718,18 @@ static void preinit(int argc, char **argv)
 			case OPT_OUTPUT_GAMMA:
 				state.output_gamma = strtod(optarg, NULL);
 				break;
-			case OPT_CONTRAST:
-				switch (sscanf(optarg, "%g:%g:%g",
-							&state.contrast[0], &state.contrast[1], &state.contrast[2])) {
-					case 1: state.contrast[1] = state.contrast[0];
-					case 2: state.contrast[2] = state.contrast[0];
-				}
-				break;
 			case OPT_BRIGHTNESS:
 				switch (sscanf(optarg, "%g:%g:%g",
 							&state.brightness[0], &state.brightness[1], &state.brightness[2])) {
 					case 1: state.brightness[1] = state.brightness[0];
 					case 2: state.brightness[2] = state.brightness[0];
+				}
+				break;
+			case OPT_CONTRAST:
+				switch (sscanf(optarg, "%g:%g:%g",
+							&state.contrast[0], &state.contrast[1], &state.contrast[2])) {
+					case 1: state.contrast[1] = state.contrast[0];
+					case 2: state.contrast[2] = state.contrast[0];
 				}
 				break;
 			case OPT_FORMAT:
@@ -1681,6 +1810,7 @@ static void preinit(int argc, char **argv)
 							viMode  = VI_MONO | VI_NON_INTERLACE | VI_STANDARD | VI_CLOCK_27MHZ;
 							#endif
 							xfbMode = VI_XFBMODE_SF;
+							state.zoom_auto = false;
 							break;
 						case MODE_NON_PROGRESSIVE:
 							viMode  = VI_MONO | VI_INTERLACE | VI_ENHANCED | VI_CLOCK_54MHZ;
@@ -1749,7 +1879,7 @@ int main(int argc, char **argv)
 	GXOverlayReadFile(state.overlay, state.overlay_id);
 
 	InputInit();
-	GBAJoyInit();
+	GBAInit();
 	NetworkInit();
 
 	struct mGUIRunner runner = {
@@ -1771,7 +1901,7 @@ int main(int argc, char **argv)
 		.configExtra = (struct GUIMenuItem[]) {
 			{
 				.title = "Screen mode",
-				.data = "screenMode",
+				.data = GUI_V_S("screenMode"),
 				.state = SM_DEFAULT,
 				.validStates = (const char *[]) {
 					"Default", "Normal", "Full", "Stretch"
@@ -1780,7 +1910,7 @@ int main(int argc, char **argv)
 			},
 			{
 				.title = "Sync to video",
-				.data = "videoSync",
+				.data = GUI_V_S("videoSync"),
 				.state = true,
 				.validStates = (const char *[]) {
 					"Off", "On"

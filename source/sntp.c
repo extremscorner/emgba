@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2015-2021, Extrems' Corner.org
+ * Copyright (c) 2015-2022, Extrems' Corner.org
  * 
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -21,19 +21,16 @@ sntp_state_t sntp = {
 	.sv.sinlen = sizeof(struct sockaddr),
 };
 
-extern uint32_t __SYS_GetRTC(uint32_t *time);
+extern uint32_t __SYS_SetRTC(uint32_t time);
 
 static bool sntp_read(int socket)
 {
-	uint32_t rtc;
 	sntp_packet_t packet;
 
-	if (!__SYS_GetRTC(&rtc))
-		return false;
 	if (net_read(socket, &packet, sizeof(packet)) < sizeof(packet))
 		return false;
-
-	SYS_SetCounterBias((packet.transmit_time >> 32) - DIFF_SEC_1900_2000 - rtc);
+	if (!__SYS_SetRTC((packet.transmit_time >> 32) - DIFF_SEC_1900_2000))
+		return false;
 
 	return true;
 }

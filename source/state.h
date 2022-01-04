@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2015-2021, Extrems' Corner.org
+ * Copyright (c) 2015-2022, Extrems' Corner.org
  * 
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -24,6 +24,8 @@ typedef struct {
 	struct { float w, h; } aspect;
 	struct { float x, y; } offset;
 	struct { float x, y; } zoom;
+	bool zoom_auto;
+	float zoom_ratio;
 	float rotation;
 	unsigned scale;
 
@@ -73,11 +75,13 @@ typedef struct {
 	enum {
 		MATRIX_IDENTITY = 0,
 		MATRIX_GBA,
+		MATRIX_GBC = MATRIX_GBA,
 		MATRIX_GBI,
 		MATRIX_NDS,
 		MATRIX_PALM,
 		MATRIX_PSP,
 		MATRIX_VBA,
+		MATRIX_GBC_DEV = MATRIX_VBA,
 		MATRIX_MAX
 	} matrix;
 
@@ -91,8 +95,8 @@ typedef struct {
 
 	float input_gamma[3];
 	float output_gamma;
-	float contrast[3];
 	float brightness[3];
+	float contrast[3];
 
 	unsigned retrace, field;
 

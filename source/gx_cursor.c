@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2015-2021, Extrems' Corner.org
+ * Copyright (c) 2015-2022, Extrems' Corner.org
  * 
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -49,7 +49,9 @@ void GXCursorDrawPoint(uint32_t index, float x, float y, float angle)
 void GXCursorAllocState(void)
 {
 	Mtx44 projection;
-	guOrtho(projection, 0., screen.h, 0., screen.w, 0., 1.);
+	guOrtho(projection,
+		-screen.y, screen.y + screen.h,
+		-screen.x, screen.x + screen.w, 0., 1.);
 
 	TPL_OpenTPLFromFile(&tdf, GXOpenFile(state.cursor));
 	TPL_GetTexture(&tdf, 0, &texobj[0]);

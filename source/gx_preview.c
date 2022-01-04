@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2015-2021, Extrems' Corner.org
+ * Copyright (c) 2015-2022, Extrems' Corner.org
  * 
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -59,17 +59,17 @@ static GXColorS10 color[][3] = {
 		{ + 0, + 0, + 0 },
 		{ +27, + 0, + 0 }
 	}, [MATRIX_NDS] = {
-		{ -32, + 0, + 0 },
-		{ + 0, + 0, + 0 },
-		{ +32, + 0, + 0 }
-	}, [MATRIX_PALM] = {
 		{ -23, + 0, + 0 },
 		{ + 0, + 0, + 0 },
 		{ +23, + 0, + 0 }
-	}, [MATRIX_PSP] = {
-		{ -46, + 0, + 0 },
+	}, [MATRIX_PALM] = {
+		{ -32, + 0, + 0 },
 		{ + 0, + 0, + 0 },
-		{ +46, + 0, + 0 }
+		{ +32, + 0, + 0 }
+	}, [MATRIX_PSP] = {
+		{ -45, + 0, + 0 },
+		{ + 0, + 0, + 0 },
+		{ +45, + 0, + 0 }
 	}, [MATRIX_VBA] = {
 		{ + 0, + 0, + 0 },
 		{ + 0, + 0, + 0 },
@@ -84,30 +84,30 @@ static GXColor kcolor[][4] = {
 		{   0,   0, 255 },
 		{  54, 182,  18 }
 	}, [MATRIX_GBA] = {
-		{ 209,  32,  50 },
-		{  61, 170,  19 },
-		{   0,  54, 186 },
-		{  71, 136,  48 }
+		{ 205,  26,  37 },
+		{  65, 168,  20 },
+		{   0,  61, 198 },
+		{  65, 136,  54 }
 	}, [MATRIX_GBI] = {
 		{ 238,  12,   7 },
 		{  45, 195,   9 },
 		{   0,  48, 239 },
 		{  60, 149,  46 }
 	}, [MATRIX_NDS] = {
-		{ 222,  26,  26 },
-		{  65, 164,  43 },
-		{   0,  65, 186 },
-		{  67, 135,  53 }
+		{ 213,  26,  27 },
+		{  65, 164,  47 },
+		{   0,  65, 181 },
+		{  66, 134,  55 }
 	}, [MATRIX_PALM] = {
-		{ 212,  19,  22 },
-		{  66, 173,  31 },
-		{   0,  64, 203 },
-		{  60, 140,  55 }
+		{ 230,  17,  23 },
+		{  57, 175,  38 },
+		{   0,  64, 194 },
+		{  62, 140,  53 }
 	}, [MATRIX_PSP] = {
-		{ 250,  10,   3 },
-		{  51, 203,   3 },
-		{   0,  42, 250 },
-		{  61, 156,  38 }
+		{ 247,  10,   3 },
+		{  52, 201,   6 },
+		{   0,  44, 245 },
+		{  60, 155,  40 }
 	}, [MATRIX_VBA] = {
 		{ 186,  22,  22 },
 		{  69, 172,  61 },
@@ -147,7 +147,9 @@ void GXPreviewDrawRect(GXTexObj texobj[3], rect_t dst_rect, rect_t src_rect)
 void GXPreviewAllocState(void)
 {
 	Mtx44 projection;
-	guOrtho(projection, -screen.h / 2, screen.h / 2, -screen.w / 2, screen.w / 2, 0., 1.);
+	guOrtho(projection,
+		-screen.y - screen.h / 2, screen.y + screen.h / 2,
+		-screen.x - screen.w / 2, screen.x + screen.w / 2, 0., 1.);
 
 	switch (state.scaler) {
 		case SCALER_AREA:

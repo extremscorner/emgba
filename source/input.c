@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2015-2021, Extrems' Corner.org
+ * Copyright (c) 2015-2022, Extrems' Corner.org
  * 
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -13,6 +13,7 @@
 #include <ogc/system.h>
 #include <wiiuse/wpad.h>
 #include "input.h"
+#include "state.h"
 #include "video.h"
 
 gc_controller_t gc_controller;
@@ -82,8 +83,6 @@ void InputRead(void)
 	}
 
 	for (int chan = 0; chan < SI_MAX_CHAN; chan++) {
-		N64_Read(chan, &n64_controller.status[chan]);
-
 		n64_controller.data[chan].last = n64_controller.data[chan].held;
 
 		if (n64_controller.status[chan].err != N64_ERR_TRANSFER) {

@@ -1,4 +1,4 @@
-Name={--aspect, Aspect Ratio}
+Name={--aspect, TV Aspect Ratio}
 Values={3:2, 3:2}, {4:3, 4:3}, {5:4, 5:4}, {16:9, 16:9}, {16:10, 16:10}
 
 Name={--format, Video Format}
@@ -11,7 +11,7 @@ Name={--scan-mode, Video Oversampling}
 Values={no-clock2x no-size2x, No}, {clock2x size2x, Yes}
 
 Name={--poll, Polling Rate}
-Values={1, 1000Hz}, {2, 500Hz}, {3, 350Hz}, {4, 300Hz}, {5, 250Hz}, {6, 200Hz}, {7, 150Hz}, {0, VSync}
+Values={0, VSync}, {1, 1000Hz}, {2, 500Hz}, {3, 350Hz}, {4, 300Hz}, {5, 250Hz}, {6, 200Hz}, {7, 150Hz}
 
 Name={--overlay-id, Border}
 Values={0, 01}, {1, 02}, {2, 03}, {3, 04}, {4, 05}, {5, 06}, {6, 07}, {7, 08}
