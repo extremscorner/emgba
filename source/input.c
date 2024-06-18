@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2015-2022, Extrems' Corner.org
+ * Copyright (c) 2015-2024, Extrems' Corner.org
  * 
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -44,13 +44,13 @@ static void poll_cb()
 
 void InputRead(void)
 {
-	for (int chan = 0; chan < PAD_CHANMAX; chan++) {
+	for (int chan = 0; chan < SI_MAX_CHAN; chan++) {
 		gc_controller.data[chan].last = gc_controller.data[chan].held;
 
 		if (gc_controller.status[chan].err != PAD_ERR_TRANSFER) {
 			gc_controller.data[chan].barrel = PAD_IsBarrel(chan);
 
-			gc_controller.data[chan].held = gc_controller.status[chan].button;
+			gc_controller.data[chan].held = gc_controller.status[chan].button & PAD_BUTTON_ALL;
 			gc_controller.data[chan].stick.x = gc_controller.status[chan].stickX;
 			gc_controller.data[chan].stick.y = gc_controller.status[chan].stickY;
 			gc_controller.data[chan].substick.x = gc_controller.status[chan].substickX;
@@ -69,7 +69,7 @@ void InputRead(void)
 		gc_steering.data[chan].last = gc_steering.data[chan].held;
 
 		if (gc_steering.status[chan].err != SI_STEERING_ERR_TRANSFER) {
-			gc_steering.data[chan].held = gc_steering.status[chan].button;
+			gc_steering.data[chan].held = gc_steering.status[chan].button & SI_STEERING_BUTTON_ALL;
 			gc_steering.data[chan].flag = gc_steering.status[chan].flag;
 			gc_steering.data[chan].wheel = gc_steering.status[chan].wheel;
 			gc_steering.data[chan].pedal.l = gc_steering.status[chan].pedalL;
@@ -86,7 +86,7 @@ void InputRead(void)
 		n64_controller.data[chan].last = n64_controller.data[chan].held;
 
 		if (n64_controller.status[chan].err != N64_ERR_TRANSFER) {
-			n64_controller.data[chan].held = n64_controller.status[chan].button;
+			n64_controller.data[chan].held = n64_controller.status[chan].button & N64_BUTTON_ALL;
 			n64_controller.data[chan].stick.x = n64_controller.status[chan].stickX;
 			n64_controller.data[chan].stick.y = n64_controller.status[chan].stickY;
 		}

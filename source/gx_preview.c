@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2015-2022, Extrems' Corner.org
+ * Copyright (c) 2015-2024, Extrems' Corner.org
  * 
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -13,16 +13,6 @@
 
 static void *displist[2];
 static uint32_t dispsize[2];
-
-static float indtexmtx[][2][3] = {
-	{
-		{ +.5, +.0, +.0 },
-		{ +.0, +.5, +.0 }
-	}, {
-		{ -.5, +.0, +.0 },
-		{ +.0, -.5, +.0 }
-	}
-};
 
 static uint16_t indtexdata[][4 * 4] ATTRIBUTE_ALIGN(32) = {
 	{
@@ -43,6 +33,16 @@ static uint16_t indtexdata[][4 * 4] ATTRIBUTE_ALIGN(32) = {
 	}
 };
 
+static float indtexmtx[][2][3] = {
+	{
+		{ +.5, +.0, +.0 },
+		{ +.0, +.5, +.0 }
+	}, {
+		{ -.5, +.0, +.0 },
+		{ +.0, -.5, +.0 }
+	}
+};
+
 static GXTexObj indtexobj;
 
 static GXColorS10 color[][3] = {
@@ -50,26 +50,54 @@ static GXColorS10 color[][3] = {
 		{ + 0, + 0, + 0 },
 		{ + 0, + 0, + 0 },
 		{ + 0, + 0, + 0 }
-	}, [MATRIX_GBA] = {
-		{ -15, + 0, + 0 },
+	}, [MATRIX_GAMBATTE] = {
 		{ + 0, + 0, + 0 },
+		{ + 0, + 0, + 0 },
+		{ + 0, + 0, + 0 }
+	}, [MATRIX_GBA] = {
+		{ -19, + 0, + 0 },
+		{ + 0, + 0, + 0 },
+		{ +19, + 0, + 0 }
+	}, [MATRIX_GBASP] = {
+		{ -15, + 0, - 7 },
+		{ + 0, + 0, + 7 },
 		{ +15, + 0, + 0 }
+	}, [MATRIX_GBASP_D65] = {
+		{ -16, + 0, - 7 },
+		{ + 0, + 0, + 7 },
+		{ +16, + 0, + 0 }
 	}, [MATRIX_GBI] = {
 		{ -27, + 0, + 0 },
 		{ + 0, + 0, + 0 },
 		{ +27, + 0, + 0 }
+	}, [MATRIX_HIGAN] = {
+		{ + 0, + 0, + 0 },
+		{ + 0, + 0, + 0 },
+		{ + 0, + 0, + 0 }
 	}, [MATRIX_NDS] = {
+		{ -19, + 0, + 0 },
+		{ + 0, + 0, + 0 },
+		{ +19, + 0, + 0 }
+	}, [MATRIX_NDS_D65] = {
 		{ -23, + 0, + 0 },
 		{ + 0, + 0, + 0 },
 		{ +23, + 0, + 0 }
 	}, [MATRIX_PALM] = {
+		{ -18, + 0, + 0 },
+		{ + 0, + 0, + 0 },
+		{ +18, + 0, + 0 }
+	}, [MATRIX_PALM_D65] = {
 		{ -32, + 0, + 0 },
 		{ + 0, + 0, + 0 },
 		{ +32, + 0, + 0 }
 	}, [MATRIX_PSP] = {
-		{ -45, + 0, + 0 },
+		{ -33, + 0, + 0 },
 		{ + 0, + 0, + 0 },
-		{ +45, + 0, + 0 }
+		{ +33, + 0, + 0 }
+	}, [MATRIX_PSP_D65] = {
+		{ -38, + 0, + 0 },
+		{ + 0, + 0, + 0 },
+		{ +38, + 0, + 0 }
 	}, [MATRIX_VBA] = {
 		{ + 0, + 0, + 0 },
 		{ + 0, + 0, + 0 },
@@ -83,31 +111,66 @@ static GXColor kcolor[][4] = {
 		{   0, 255,   0 },
 		{   0,   0, 255 },
 		{  54, 182,  18 }
+	}, [MATRIX_GAMBATTE] = {
+		{ 207,   0,  48 },
+		{  32, 191,  32 },
+		{  16,  64, 175 },
+		{  68, 141,  46 }
 	}, [MATRIX_GBA] = {
-		{ 205,  26,  37 },
-		{  65, 168,  20 },
-		{   0,  61, 198 },
-		{  65, 136,  54 }
+		{ 204,  34,  50 },
+		{  70, 163,  40 },
+		{   0,  57, 166 },
+		{  72, 134,  49 }
+	}, [MATRIX_GBASP] = {
+		{ 213,   7,   1 },
+		{  25, 185,   0 },
+		{   0,  17, 255 },
+		{  51, 137,  27 }
+	}, [MATRIX_GBASP_D65] = {
+		{ 237,   9,   1 },
+		{  27, 220,   0 },
+		{   0,  19, 255 },
+		{  57, 162,  29 }
 	}, [MATRIX_GBI] = {
 		{ 238,  12,   7 },
 		{  45, 195,   9 },
 		{   0,  48, 239 },
 		{  60, 149,  46 }
+	}, [MATRIX_HIGAN] = {
+		{ 255,  10,  50 },
+		{  50, 230,  10 },
+		{   0,  30, 220 },
+		{  65, 176,  37 }
 	}, [MATRIX_NDS] = {
-		{ 213,  26,  27 },
-		{  65, 164,  47 },
-		{   0,  65, 181 },
-		{  66, 134,  55 }
+		{ 180,  23,  27 },
+		{  60, 149,  44 },
+		{   0,  61, 184 },
+		{  57, 123,  53 }
+	}, [MATRIX_NDS_D65] = {
+		{ 208,  26,  27 },
+		{  70, 163,  44 },
+		{   0,  66, 184 },
+		{  64, 135,  56 }
 	}, [MATRIX_PALM] = {
+		{ 134,  13,  23 },
+		{  33, 139,  38 },
+		{   0,  50, 194 },
+		{  40, 109,  46 }
+	}, [MATRIX_PALM_D65] = {
 		{ 230,  17,  23 },
 		{  57, 175,  38 },
 		{   0,  64, 194 },
 		{  62, 140,  53 }
 	}, [MATRIX_PSP] = {
-		{ 247,  10,   3 },
-		{  52, 201,   6 },
-		{   0,  44, 245 },
-		{  60, 155,  40 }
+		{ 213,  11,   6 },
+		{  41, 190,   4 },
+		{   0,  40, 245 },
+		{  53, 145,  39 }
+	}, [MATRIX_PSP_D65] = {
+		{ 246,  11,   6 },
+		{  47, 201,   4 },
+		{   0,  42, 245 },
+		{  61, 154,  40 }
 	}, [MATRIX_VBA] = {
 		{ 186,  22,  22 },
 		{  69, 172,  61 },
@@ -201,7 +264,7 @@ void GXPreviewAllocState(void)
 		GX_SetTevKColorSel(GX_TEVSTAGE0, GX_TEV_KCSEL_K0);
 		GX_SetTevColorIn(GX_TEVSTAGE0, GX_CC_ZERO, GX_CC_KONST, GX_CC_TEXC, GX_CC_C0);
 		GX_SetTevColorOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_FALSE, GX_TEVPREV);
-		GX_SetTevIndirect(GX_TEVSTAGE0, GX_INDTEXSTAGE0, GX_ITF_8, GX_ITB_STU, GX_ITM_0, GX_ITW_OFF, GX_ITW_OFF, GX_FALSE, GX_FALSE, GX_ITBA_OFF);
+		GX_SetTevIndWarp(GX_TEVSTAGE0, GX_INDTEXSTAGE0, GX_TRUE, GX_FALSE, GX_ITM_0);
 
 		GX_SetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD0, GX_TEXMAP1, GX_COLORNULL);
 		GX_SetTevKColorSel(GX_TEVSTAGE1, GX_TEV_KCSEL_K1);
@@ -292,7 +355,7 @@ void GXPreviewAllocState(void)
 		GX_SetTevKColorSel(GX_TEVSTAGE0, GX_TEV_KCSEL_K3_R);
 		GX_SetTevColorIn(GX_TEVSTAGE0, GX_CC_ZERO, GX_CC_KONST, GX_CC_TEXC, GX_CC_ZERO);
 		GX_SetTevColorOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
-		GX_SetTevIndirect(GX_TEVSTAGE0, GX_INDTEXSTAGE0, GX_ITF_8, GX_ITB_STU, GX_ITM_0, GX_ITW_OFF, GX_ITW_OFF, GX_FALSE, GX_FALSE, GX_ITBA_OFF);
+		GX_SetTevIndWarp(GX_TEVSTAGE0, GX_INDTEXSTAGE0, GX_TRUE, GX_FALSE, GX_ITM_0);
 
 		GX_SetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD0, GX_TEXMAP1, GX_COLORNULL);
 		GX_SetTevKColorSel(GX_TEVSTAGE1, GX_TEV_KCSEL_K3_G);

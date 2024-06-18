@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2015-2022, Extrems' Corner.org
+ * Copyright (c) 2015-2024, Extrems' Corner.org
  * 
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -110,13 +110,13 @@ void GXOverlayReadMemEx(void *buffer, int size, int index)
 void GXOverlayReadMem(void *buffer, int size, int index)
 {
 	TPL_CloseTPLFile(&tdf);
-	TPL_OpenTPLFromFile(&tdf, GXOpenMem(buffer, size));
+	TPL_OpenTPLFromHandle(&tdf, GXOpenMem(buffer, size));
 	TPL_GetTexture(&tdf, MIN(index, tdf.ntextures - 1), &texobj);
 }
 
 void GXOverlayReadFile(const char *file, int index)
 {
 	TPL_CloseTPLFile(&tdf);
-	TPL_OpenTPLFromFile(&tdf, GXOpenFile(file));
+	TPL_OpenTPLFromHandle(&tdf, GXOpenFile(file));
 	TPL_GetTexture(&tdf, MIN(index, tdf.ntextures - 1), &texobj);
 }

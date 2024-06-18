@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2015-2022, Extrems' Corner.org
+ * Copyright (c) 2015-2024, Extrems' Corner.org
  * 
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -120,9 +120,35 @@ void *GXAllocBuffer(uint32_t size)
 	return ptr;
 }
 
+static double trc_linear(int ch, double f) {
+	return f;
+}
+
 static double trc_gamma(int ch, double f) {
 	double V = fabs(f);
 	double L = pow(V, state.input_gamma[ch]);
+	return copysign(L, f);
+}
+
+static double trc_piecewise(int ch, double f) {
+	double V = fabs(f);
+	double L;
+
+	if (state.input_gamma[ch] <= 1. + state.input_alpha[ch]) {
+		L = pow(V, state.input_gamma[ch]);
+	} else {
+		double kappa = state.input_alpha[ch] / (state.input_gamma[ch] - 1.);
+		double phi = pow((1. + state.input_alpha[ch]) / state.input_gamma[ch], state.input_gamma[ch])
+		           * pow((state.input_gamma[ch] - 1.) / state.input_alpha[ch], state.input_gamma[ch] - 1.);
+		L = V <= kappa ? V / phi : pow((V + state.input_alpha[ch]) / (1. + state.input_alpha[ch]), state.input_gamma[ch]);
+	}
+
+	return copysign(L, f);
+}
+
+static double trc_iec61966(int ch, double f) {
+	double V = fabs(f);
+	double L = V <= .04045 ? V / 12.92 : pow((V + .055) / 1.055, 2.4);
 	return copysign(L, f);
 }
 
@@ -138,15 +164,13 @@ static double trc_smpte240(int ch, double f) {
 	return copysign(L, f);
 }
 
-static double trc_linear(int ch, double f) {
-	return f;
-}
-
 static double (*trc_funcs[])(int, double) = {
+	trc_linear,
 	trc_gamma,
+	trc_piecewise,
+	trc_iec61966,
 	trc_itu709,
-	trc_smpte240,
-	trc_linear
+	trc_smpte240
 };
 
 static void fill_lut(int ch, double (*func)(int, double), hword_t *lut)

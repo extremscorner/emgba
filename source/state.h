@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2015-2022, Extrems' Corner.org
+ * Copyright (c) 2015-2024, Extrems' Corner.org
  * 
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -73,27 +73,59 @@ typedef struct {
 	} scaler;
 
 	enum {
+		INTENT_PERCEPTUAL = 0,
+		INTENT_RELATIVE_COLORIMETRIC,
+		INTENT_SATURATION,
+		INTENT_ABSOLUTE_COLORIMETRIC,
+	} profile_intent;
+
+	enum {
+		PROFILE_SRGB = 0,
+		PROFILE_GAMBATTE,
+		PROFILE_GBA,
+		PROFILE_GBASP,
+		PROFILE_GBC,
+		PROFILE_GBI,
+		PROFILE_HICOLOUR,
+		PROFILE_HIGAN,
+		PROFILE_NDS,
+		PROFILE_PALM,
+		PROFILE_PSP,
+		PROFILE_MAX
+	} profile;
+
+	enum {
 		MATRIX_IDENTITY = 0,
+		MATRIX_GAMBATTE,
 		MATRIX_GBA,
-		MATRIX_GBC = MATRIX_GBA,
+		MATRIX_GBASP,
+		MATRIX_GBASP_D65,
 		MATRIX_GBI,
+		MATRIX_HIGAN,
 		MATRIX_NDS,
+		MATRIX_NDS_D65,
 		MATRIX_PALM,
+		MATRIX_PALM_D65,
 		MATRIX_PSP,
+		MATRIX_PSP_D65,
 		MATRIX_VBA,
-		MATRIX_GBC_DEV = MATRIX_VBA,
-		MATRIX_MAX
+		MATRIX_MAX,
+		MATRIX_GBC = MATRIX_GBA,
+		MATRIX_HICOLOUR = MATRIX_VBA,
 	} matrix;
 
 	enum {
-		TRC_GAMMA = 0,
+		TRC_LINEAR = 0,
+		TRC_GAMMA,
+		TRC_PIECEWISE,
+		TRC_IEC61966,
 		TRC_ITU709,
 		TRC_SMPTE240,
-		TRC_LINEAR,
 		TRC_MAX
 	} input_trc;
 
 	float input_gamma[3];
+	float input_alpha[3];
 	float output_gamma;
 	float brightness[3];
 	float contrast[3];

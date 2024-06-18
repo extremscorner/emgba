@@ -1,5 +1,5 @@
 Name={--aspect, TV Aspect Ratio}
-Values={3:2, 3:2}, {4:3, 4:3}, {5:4, 5:4}, {16:9, 16:9}, {16:10, 16:10}
+Values={4:3, 4:3}, {5:4, 5:4}, {16:9, 16:9}, {16:10, 16:10}, {3:2, 3:2}
 
 Name={--format, Video Format}
 Values={ntsc, NTSC}, {pal, PAL}, {pal-m, PAL-M}, {ntsc-50, NTSC-50}, {pal-60, PAL-60}, {custom, Custom}, {custom-m, Custom-M}, {hd60, HD60}
@@ -20,7 +20,7 @@ Name={--filter, Filter}
 Values={none, Sharp}, {blend, Soft}, {deflicker, Normal}, {scale2xex, Scale2×Ex}, {scale2xplus, Scale2×Plus}, {scale2x, Scale2×}, {eagle2x, Eagle2×}, {scan2x, Scan2×}
 
 Name={--matrix, Color Matrix}
-Values={identity, Identity}, {gba, GBA}, {gbi, GBI}, {nds, NDS}, {palm, Palm}, {psp, PSP}, {vba, VBA}
+Values={identity, Identity}, {gba, GBA}, {gbasp, GBASP}, {gbi, GBI}, {nds, NDS}, {palm, Palm}, {psp, PSP}, {vba, VBA}
 
 Name={--input-gamma, Decoding Gamma}
 Values={1.0, 1.0}, {1.2, 1.2}, {1.4, 1.4}, {1.6, 1.6}, {1.8, 1.8}, {2.0, 2.0}, {2.2, 2.2}, {2.4, 2.4}

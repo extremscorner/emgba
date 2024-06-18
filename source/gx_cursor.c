@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2015-2022, Extrems' Corner.org
+ * Copyright (c) 2015-2024, Extrems' Corner.org
  * 
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -53,7 +53,7 @@ void GXCursorAllocState(void)
 		-screen.y, screen.y + screen.h,
 		-screen.x, screen.x + screen.w, 0., 1.);
 
-	TPL_OpenTPLFromFile(&tdf, GXOpenFile(state.cursor));
+	TPL_OpenTPLFromHandle(&tdf, GXOpenFile(state.cursor));
 	TPL_GetTexture(&tdf, 0, &texobj[0]);
 	TPL_GetTexture(&tdf, 1, &texobj[1]);
 	TPL_GetTexture(&tdf, 2, &texobj[2]);

@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2015-2022, Extrems' Corner.org
+ * Copyright (c) 2015-2024, Extrems' Corner.org
  * 
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -19,8 +19,8 @@
 #include <asndlib.h>
 #include <wiiuse/wpad.h>
 #include <fat.h>
-#include "clock.h"
 #include "3ds.h"
+#include "clock.h"
 #include "gba.h"
 #include "gbp.h"
 #include "gx.h"
@@ -33,7 +33,6 @@
 
 #include <mgba/flags.h>
 
-#include <mgba/core/blip_buf.h>
 #include <mgba/core/core.h>
 #include "feature/gui/gui-runner.h"
 #include <mgba/internal/gba/gba.h>
@@ -49,25 +48,27 @@ static gx_surface_t convert_surface, packed_surface;
 static gx_surface_t planar_surface, prescale_surface;
 
 state_t default_state, state = {
-	.draw_osd      = true,
-	.draw_wait     = true,
-	.aspect        = { 4., 3. },
-	.zoom          = { 2., 2. },
-	.zoom_auto     = true,
-	.zoom_ratio    = .75,
-	.scale         = 1,
-	.poll          = 1,
-	.cursor        = "point.tpl.gz",
-	.overlay       = "frame.tpl.gz",
-	.filter        = FILTER_NONE,
-	.filter_weight = { 141/255., 141/255., 141/255. },
-	.dither        = DITHER_THRESHOLD,
-	.scaler        = SCALER_AREA,
-	.matrix        = MATRIX_GBI,
-	.input_trc     = TRC_GAMMA,
-	.input_gamma   = { 2.2, 2.2, 2.2 },
-	.output_gamma  = 2.2,
-	.contrast      = { 1., 1., 1. },
+	.draw_osd       = true,
+	.draw_wait      = true,
+	.aspect         = { 4., 3. },
+	.zoom           = { 2., 2. },
+	.zoom_auto      = true,
+	.zoom_ratio     = .75,
+	.scale          = 1,
+	.poll           = 1,
+	.cursor         = "point.tpl.gz",
+	.overlay        = "frame.tpl.gz",
+	.filter         = FILTER_NONE,
+	.filter_weight  = { 141./255., 141./255., 141./255. },
+	.dither         = DITHER_THRESHOLD,
+	.scaler         = SCALER_AREA,
+	.profile_intent = INTENT_PERCEPTUAL,
+	.profile        = PROFILE_GBI,
+	.matrix         = MATRIX_GBI,
+	.input_trc      = TRC_GAMMA,
+	.input_gamma    = { 2.2, 2.2, 2.2 },
+	.output_gamma   = 2.2,
+	.contrast       = { 1., 1., 1. },
 };
 
 #ifdef HW_DOL
@@ -395,37 +396,50 @@ static void _guiFinish(void)
 	dispsize[3] = GX_EndDispList();
 }
 
-static struct GBAStereoSample audio_frame[2][16384] ATTRIBUTE_ALIGN(32);
-static unsigned audio_index;
+static struct mStereoSample audioBuffer[2][16384] ATTRIBUTE_ALIGN(32);
+static unsigned audioBufferIndex;
+static unsigned audioBufferSize;
+static unsigned audioRate;
+static double fpsRatio;
 
-static void _postAudioBuffer(struct mAVStream *stream, blip_t *left, blip_t *right)
+static void _audioRateChanged(struct mAVStream *stream, unsigned rate)
+{
+	audioRate = rate * fpsRatio;
+	audioBufferSize = (audioRate * 1024 + (48000 - 1)) / 48000;
+	ASND_ChangePitchVoice(0, audioRate);
+}
+
+static void _postAudioBuffer(struct mAVStream *stream, struct mAudioBuffer *buffer)
 {
 	uint32_t level;
 
 	if (ASND_TestVoiceBufferReady(0) == SND_OK) {
-		int avail = blip_samples_avail(left) & ~(1024 - 1);
-		blip_read_samples(right, &audio_frame[audio_index][0].left, avail, true);
-		blip_read_samples(left, &audio_frame[audio_index][0].right, avail, true);
+		size_t available = mAudioBufferAvailable(buffer) / audioBufferSize * audioBufferSize;
+		mAudioBufferRead(buffer, (int16_t *)audioBuffer[audioBufferIndex], available);
 
 		_CPU_ISR_Disable(level);
 
 		if (ASND_StatusVoice(0) == SND_UNUSED) {
-			if (ASND_SetVoice(0, VOICE_STEREO_16BIT, 48000, 0, audio_frame[audio_index], avail * 4, MAX_VOLUME, MAX_VOLUME, NULL) == SND_OK)
-				audio_index ^= 1;
+			if (ASND_SetVoice(0, VOICE_STEREO_16BIT, audioRate, 0, audioBuffer[audioBufferIndex], available * 4, MAX_VOLUME, MAX_VOLUME, NULL) == SND_OK)
+				audioBufferIndex ^= 1;
 		} else {
-			if (ASND_AddVoice(0, audio_frame[audio_index], avail * 4) == SND_OK)
-				audio_index ^= 1;
+			if (ASND_AddVoice(0, audioBuffer[audioBufferIndex], available * 4) == SND_OK)
+				audioBufferIndex ^= 1;
 		}
 
 		_CPU_ISR_Restore(level);
+	} else {
+		if (mAudioBufferAvailable(buffer) == mAudioBufferCapacity(buffer))
+			mAudioBufferClear(buffer);
 	}
 }
 
 static struct mAVStream stream = {
+	.audioRateChanged = _audioRateChanged,
 	.postAudioBuffer = _postAudioBuffer,
 };
 
-static void _setRumble(struct mRumble *rumble, int enable)
+static void _setRumble(struct mRumble *rumble, bool enable, uint32_t sinceLast)
 {
 	PAD_ControlMotor(PAD_CHAN0, enable);
 	#ifdef HW_RVL
@@ -705,7 +719,7 @@ static void _gameLoaded(struct mGUIRunner *runner)
 	}
 
 	unsigned width, height;
-	runner->core->desiredVideoDimensions(runner->core, &width, &height);
+	runner->core->currentVideoSize(runner->core, &width, &height);
 	outputBuffer = GXAllocBuffer(width * height * BYTES_PER_PIXEL);
 	runner->core->setVideoBuffer(runner->core, outputBuffer, width);
 
@@ -731,7 +745,7 @@ static void _gameLoaded(struct mGUIRunner *runner)
 	else GXAllocSurface(&prescale_surface, width * state.scale, height * state.scale, GX_TF_I8, 3);
 	GXSetSurfaceFilt(&prescale_surface, state.scaler == SCALER_NEAREST ? GX_NEAR : GX_LINEAR);
 
-	runner->core->setAudioBufferSize(runner->core, 1024 * 2);
+	runner->core->setAudioBufferSize(runner->core, 1024 * 3);
 
 	runner->core->setAVStream(runner->core, &stream);
 
@@ -916,7 +930,7 @@ static void _prepareForFrame(struct mGUIRunner *runner)
 static void _drawFrame(struct mGUIRunner *runner, bool faded)
 {
 	unsigned width, height;
-	runner->core->desiredVideoDimensions(runner->core, &width, &height);
+	runner->core->currentVideoSize(runner->core, &width, &height);
 
 	rect_t planar_src   = {0, 0, width, height};
 	rect_t prescale_src = {0, 0, planar_src.w * state.scale, planar_src.h * state.scale};
@@ -1110,7 +1124,7 @@ static void _paused(struct mGUIRunner *runner)
 static void _unpaused(struct mGUIRunner *runner)
 {
 	unsigned mode;
-	float fps, sampleRate;
+	float fps;
 	bool sync, interframeBlending;
 
 	state.draw_osd = false;
@@ -1140,9 +1154,8 @@ static void _unpaused(struct mGUIRunner *runner)
 		gxclock.hz = viclock.hz;
 	}
 
-	sampleRate = GBAAudioCalculateRatio(1., gxclock.hz, aiclock.hz);
-	blip_set_rates(runner->core->getAudioChannel(runner->core, 0), runner->core->frequency(runner->core), sampleRate);
-	blip_set_rates(runner->core->getAudioChannel(runner->core, 1), runner->core->frequency(runner->core), sampleRate);
+	fpsRatio = ASND_GetAudioRate() / (mCoreCalculateFramerateRatio(runner->core, gxclock.hz) * aiclock.hz);
+	_audioRateChanged(&stream, runner->core->audioSampleRate(runner->core));
 }
 
 static void _incrementScreenMode(struct mGUIRunner *runner)
@@ -1279,7 +1292,7 @@ static void preinit(int argc, char **argv)
 	for (int chn = 0; chn < EXI_CHANNEL_2; chn++)
 		CON_EnableGecko(chn, FALSE);
 
-	puts("Enhanced mGBA © 2015-2022 Extrems' Corner.org");
+	puts("Enhanced mGBA © 2015-2024 Extrems' Corner.org");
 
 	if (fatInitDefault()) {
 		mkdir("/mGBA", 0755);
@@ -1357,9 +1370,11 @@ static void preinit(int argc, char **argv)
 		OPT_FILTER,
 		OPT_DITHER,
 		OPT_SCALER,
-		OPT_MATRIX,
+		OPT_PROFILE_INTENT,
 		OPT_PROFILE,
+		OPT_MATRIX,
 		OPT_INPUT_GAMMA,
+		OPT_INPUT_ALPHA,
 		OPT_OUTPUT_GAMMA,
 		OPT_BRIGHTNESS,
 		OPT_CONTRAST,
@@ -1373,34 +1388,36 @@ static void preinit(int argc, char **argv)
 	};
 	int optc, longind;
 	static struct option longopts[] = {
-		{ "aspect",        required_argument, NULL, OPT_ASPECT        },
-		{ "offset",        required_argument, NULL, OPT_OFFSET        },
-		{ "zoom",          required_argument, NULL, OPT_ZOOM          },
-		{ "zoom-auto",     optional_argument, NULL, OPT_ZOOM_AUTO     },
-		{ "rotate",        required_argument, NULL, OPT_ROTATE        },
-		{ "poll",          required_argument, NULL, OPT_POLL          },
-		{ "cursor",        required_argument, NULL, OPT_CURSOR        },
-		{ "no-cursor",     no_argument,       NULL, OPT_NO_CURSOR     },
-		{ "overlay",       required_argument, NULL, OPT_OVERLAY       },
-		{ "no-overlay",    no_argument,       NULL, OPT_NO_OVERLAY    },
-		{ "overlay-id",    required_argument, NULL, OPT_OVERLAY_ID    },
-		{ "overlay-scale", required_argument, NULL, OPT_OVERLAY_SCALE },
-		{ "filter",        required_argument, NULL, OPT_FILTER        },
-		{ "dither",        required_argument, NULL, OPT_DITHER        },
-		{ "scaler",        required_argument, NULL, OPT_SCALER        },
-		{ "matrix",        required_argument, NULL, OPT_MATRIX        },
-		{ "profile",       required_argument, NULL, OPT_PROFILE       },
-		{ "input-gamma",   required_argument, NULL, OPT_INPUT_GAMMA   },
-		{ "output-gamma",  required_argument, NULL, OPT_OUTPUT_GAMMA  },
-		{ "brightness",    required_argument, NULL, OPT_BRIGHTNESS    },
-		{ "contrast",      required_argument, NULL, OPT_CONTRAST      },
-		{ "format",        required_argument, NULL, OPT_FORMAT        },
-		{ "scan-mode",     required_argument, NULL, OPT_SCAN_MODE     },
-		{ "ipv4-address",  required_argument, NULL, OPT_IPV4_ADDRESS  },
-		{ "ipv4-gateway",  required_argument, NULL, OPT_IPV4_GATEWAY  },
-		{ "ipv4-netmask",  required_argument, NULL, OPT_IPV4_NETMASK  },
-		{ "network",       no_argument,       NULL, OPT_NETWORK       },
-		{ "no-network",    no_argument,       NULL, OPT_NO_NETWORK    },
+		{ "aspect",          required_argument, NULL, OPT_ASPECT        },
+		{ "offset",          required_argument, NULL, OPT_OFFSET        },
+		{ "zoom",            required_argument, NULL, OPT_ZOOM          },
+		{ "zoom-auto",       optional_argument, NULL, OPT_ZOOM_AUTO     },
+		{ "rotate",          required_argument, NULL, OPT_ROTATE        },
+		{ "poll",            required_argument, NULL, OPT_POLL          },
+		{ "cursor",          required_argument, NULL, OPT_CURSOR        },
+		{ "no-cursor",       no_argument,       NULL, OPT_NO_CURSOR     },
+		{ "overlay",         required_argument, NULL, OPT_OVERLAY       },
+		{ "no-overlay",      no_argument,       NULL, OPT_NO_OVERLAY    },
+		{ "overlay-id",      required_argument, NULL, OPT_OVERLAY_ID    },
+		{ "overlay-scale",   required_argument, NULL, OPT_OVERLAY_SCALE },
+		{ "filter",          required_argument, NULL, OPT_FILTER        },
+		{ "dither",          required_argument, NULL, OPT_DITHER        },
+		{ "scaler",          required_argument, NULL, OPT_SCALER        },
+		{ "profile-intent",  required_argument, NULL, OPT_PROFILE_INTENT  },
+		{ "profile",         required_argument, NULL, OPT_PROFILE       },
+		{ "matrix",          required_argument, NULL, OPT_MATRIX          },
+		{ "input-gamma",     required_argument, NULL, OPT_INPUT_GAMMA   },
+		{ "input-alpha",     required_argument, NULL, OPT_INPUT_ALPHA     },
+		{ "output-gamma",    required_argument, NULL, OPT_OUTPUT_GAMMA  },
+		{ "brightness",      required_argument, NULL, OPT_BRIGHTNESS    },
+		{ "contrast",        required_argument, NULL, OPT_CONTRAST      },
+		{ "format",          required_argument, NULL, OPT_FORMAT        },
+		{ "scan-mode",       required_argument, NULL, OPT_SCAN_MODE     },
+		{ "ipv4-address",    required_argument, NULL, OPT_IPV4_ADDRESS  },
+		{ "ipv4-gateway",    required_argument, NULL, OPT_IPV4_GATEWAY  },
+		{ "ipv4-netmask",    required_argument, NULL, OPT_IPV4_NETMASK  },
+		{ "network",         no_argument,       NULL, OPT_NETWORK       },
+		{ "no-network",      no_argument,       NULL, OPT_NO_NETWORK    },
 		{ NULL }
 	};
 	while ((optc = getopt_long(argc, argv, "-", longopts, &longind)) != EOF) {
@@ -1580,34 +1597,47 @@ static void preinit(int argc, char **argv)
 				else if (strcmp(optarg, "box") == 0)
 					state.scaler = SCALER_BOX;
 				break;
-			case OPT_MATRIX:
-				if (strcmp(optarg, "identity") == 0)
-					state.matrix = MATRIX_IDENTITY;
-				else if (strcmp(optarg, "gba") == 0)
-					state.matrix = MATRIX_GBA;
-				else if (strcmp(optarg, "gbc") == 0)
-					state.matrix = MATRIX_GBC;
-				else if (strcmp(optarg, "gbc-dev") == 0)
-					state.matrix = MATRIX_GBC_DEV;
-				else if (strcmp(optarg, "gbi") == 0)
-					state.matrix = MATRIX_GBI;
-				else if (strcmp(optarg, "nds") == 0)
-					state.matrix = MATRIX_NDS;
-				else if (strcmp(optarg, "palm") == 0)
-					state.matrix = MATRIX_PALM;
-				else if (strcmp(optarg, "psp") == 0)
-					state.matrix = MATRIX_PSP;
-				else if (strcmp(optarg, "vba") == 0)
-					state.matrix = MATRIX_VBA;
+			case OPT_PROFILE_INTENT:
+				if (strcmp(optarg, "perceptual") == 0)
+					state.profile_intent = INTENT_PERCEPTUAL;
+				else if (strcmp(optarg, "relative") == 0)
+					state.profile_intent = INTENT_RELATIVE_COLORIMETRIC;
+				else if (strcmp(optarg, "saturation") == 0)
+					state.profile_intent = INTENT_SATURATION;
+				else if (strcmp(optarg, "absolute") == 0)
+					state.profile_intent = INTENT_ABSOLUTE_COLORIMETRIC;
 				break;
 			case OPT_PROFILE:
 				if (strcmp(optarg, "srgb") == 0) {
+					state.profile = PROFILE_SRGB;
 					state.matrix = MATRIX_IDENTITY;
-					state.input_trc = TRC_GAMMA;
+					state.input_trc = TRC_LINEAR;
 					state.input_gamma[0] = 
 					state.input_gamma[1] = 
-					state.input_gamma[2] = 2.2;
-					state.output_gamma = 2.2;
+					state.input_gamma[2] = 1.;
+					state.input_alpha[0] = 
+					state.input_alpha[1] = 
+					state.input_alpha[2] = 0.;
+					state.output_gamma = 1.;
+					state.brightness[0] = 
+					state.brightness[1] = 
+					state.brightness[2] = 0.;
+					state.contrast[0] = 
+					state.contrast[1] = 
+					state.contrast[2] = 1.;
+				} else if (strcmp(optarg, "gambatte") == 0) {
+					state.profile = PROFILE_GAMBATTE;
+					if (state.profile_intent == INTENT_SATURATION)
+						state.matrix = MATRIX_IDENTITY;
+					else state.matrix = MATRIX_GAMBATTE;
+					state.input_trc = TRC_LINEAR;
+					state.input_gamma[0] = 
+					state.input_gamma[1] = 
+					state.input_gamma[2] = 1.;
+					state.input_alpha[0] = 
+					state.input_alpha[1] = 
+					state.input_alpha[2] = 0.;
+					state.output_gamma = 1.;
 					state.brightness[0] = 
 					state.brightness[1] = 
 					state.brightness[2] = 0.;
@@ -1615,50 +1645,117 @@ static void preinit(int argc, char **argv)
 					state.contrast[1] = 
 					state.contrast[2] = 1.;
 				} else if (strcmp(optarg, "gba") == 0) {
-					state.matrix = MATRIX_GBA;
+					state.profile = PROFILE_GBA;
+					if (state.profile_intent == INTENT_SATURATION)
+						state.matrix = MATRIX_IDENTITY;
+					else state.matrix = MATRIX_GBA;
 					state.input_trc = TRC_GAMMA;
 					state.input_gamma[0] = 
 					state.input_gamma[1] = 
 					state.input_gamma[2] = 4.;
+					state.input_alpha[0] = 
+					state.input_alpha[1] = 
+					state.input_alpha[2] = 0.;
 					state.output_gamma = 2.2;
 					state.brightness[0] = 
 					state.brightness[1] = 
 					state.brightness[2] = powf(1./250., 1./4.);
-					state.contrast[0] = 
-					state.contrast[1] = 
-					state.contrast[2] = 1. - state.brightness[0];
-				} else if (strcmp(optarg, "gbc") == 0) {
-					state.matrix = MATRIX_GBC;
+
+					switch (state.profile_intent) {
+						case INTENT_PERCEPTUAL:
+							state.contrast[0] = 
+							state.contrast[1] = 
+							state.contrast[2] = powf(1./1.075, 1./4.);
+							break;
+						default:
+							state.contrast[0] = 
+							state.contrast[1] = 
+							state.contrast[2] = 1.;
+					}
+
+					state.contrast[0] -= state.brightness[0];
+					state.contrast[1] -= state.brightness[1];
+					state.contrast[2] -= state.brightness[2];
+				} else if (strcmp(optarg, "gbasp") == 0) {
+					state.profile = PROFILE_GBASP;
+
+					switch (state.profile_intent) {
+						case INTENT_SATURATION:            state.matrix = MATRIX_IDENTITY;  break;
+						case INTENT_ABSOLUTE_COLORIMETRIC: state.matrix = MATRIX_GBASP;     break;
+						default:                           state.matrix = MATRIX_GBASP_D65;
+					}
+
 					state.input_trc = TRC_GAMMA;
 					state.input_gamma[0] = 
 					state.input_gamma[1] = 
 					state.input_gamma[2] = 2.2;
+					state.input_alpha[0] = 
+					state.input_alpha[1] = 
+					state.input_alpha[2] = 0.;
+					state.output_gamma = 2.2;
+					state.brightness[0] = 
+					state.brightness[1] = 
+					state.brightness[2] = powf(1./600., 1./2.2);
+
+					switch (state.profile_intent) {
+						case INTENT_PERCEPTUAL:
+							state.contrast[0] = 
+							state.contrast[1] = 
+							state.contrast[2] = powf(1./1.065 * 1.0275, 1./2.2);
+							break;
+						default:
+							state.contrast[0] = 
+							state.contrast[1] = 
+							state.contrast[2] = 1.;
+					}
+
+					state.contrast[0] -= state.brightness[0];
+					state.contrast[1] -= state.brightness[1];
+					state.contrast[2] -= state.brightness[2];
+				} else if (strcmp(optarg, "gbc") == 0) {
+					state.profile = PROFILE_GBC;
+					if (state.profile_intent == INTENT_SATURATION)
+						state.matrix = MATRIX_IDENTITY;
+					else state.matrix = MATRIX_GBC;
+					state.input_trc = TRC_GAMMA;
+					state.input_gamma[0] = 
+					state.input_gamma[1] = 
+					state.input_gamma[2] = 2.2;
+					state.input_alpha[0] = 
+					state.input_alpha[1] = 
+					state.input_alpha[2] = 0.;
 					state.output_gamma = 2.2;
 					state.brightness[0] = 
 					state.brightness[1] = 
 					state.brightness[2] = powf(1./75., 1./2.2);
-					state.contrast[0] = 
-					state.contrast[1] = 
-					state.contrast[2] = 1. - state.brightness[0];
-				} else if (strcmp(optarg, "gbc-dev") == 0) {
-					state.matrix = MATRIX_GBC_DEV;
-					state.input_trc = TRC_GAMMA;
-					state.input_gamma[0] = 
-					state.input_gamma[1] = 
-					state.input_gamma[2] = 1.;
-					state.output_gamma = 1.7;
-					state.brightness[0] = 
-					state.brightness[1] = 
-					state.brightness[2] = 0.;
-					state.contrast[0] = 
-					state.contrast[1] = 
-					state.contrast[2] = 1.12;
+
+					switch (state.profile_intent) {
+						case INTENT_PERCEPTUAL:
+							state.contrast[0] = 
+							state.contrast[1] = 
+							state.contrast[2] = powf(1./1.075, 1./2.2);
+							break;
+						default:
+							state.contrast[0] = 
+							state.contrast[1] = 
+							state.contrast[2] = 1.;
+					}
+
+					state.contrast[0] -= state.brightness[0];
+					state.contrast[1] -= state.brightness[1];
+					state.contrast[2] -= state.brightness[2];
 				} else if (strcmp(optarg, "gbi") == 0) {
-					state.matrix = MATRIX_GBI;
+					state.profile = PROFILE_GBI;
+					if (state.profile_intent == INTENT_SATURATION)
+						state.matrix = MATRIX_IDENTITY;
+					else state.matrix = MATRIX_GBI;
 					state.input_trc = TRC_SMPTE240;
 					state.input_gamma[0] = 
 					state.input_gamma[1] = 
-					state.input_gamma[2] = 2.2;
+					state.input_gamma[2] = 1/.45;
+					state.input_alpha[0] = 
+					state.input_alpha[1] = 
+					state.input_alpha[2] = .1115;
 					state.output_gamma = 2.2;
 					state.brightness[0] = 
 					state.brightness[1] = 
@@ -1666,46 +1763,179 @@ static void preinit(int argc, char **argv)
 					state.contrast[0] = 
 					state.contrast[1] = 
 					state.contrast[2] = 1.;
+				} else if (strcmp(optarg, "hicolour") == 0) {
+					state.profile = PROFILE_HICOLOUR;
+					if (state.profile_intent == INTENT_SATURATION)
+						state.matrix = MATRIX_IDENTITY;
+					else state.matrix = MATRIX_HICOLOUR;
+					state.input_trc = TRC_GAMMA;
+					state.input_gamma[0] = 
+					state.input_gamma[1] = 
+					state.input_gamma[2] = 1.;
+					state.input_alpha[0] = 
+					state.input_alpha[1] = 
+					state.input_alpha[2] = 0.;
+					state.output_gamma = 1.7;
+					state.brightness[0] = 
+					state.brightness[1] = 
+					state.brightness[2] = 0.;
+					state.contrast[0] = 
+					state.contrast[1] = 
+					state.contrast[2] = 1.12;
+				} else if (strcmp(optarg, "higan") == 0) {
+					state.profile = PROFILE_HIGAN;
+					if (state.profile_intent == INTENT_SATURATION)
+						state.matrix = MATRIX_IDENTITY;
+					else state.matrix = MATRIX_HIGAN;
+					state.input_trc = TRC_GAMMA;
+					state.input_gamma[0] = 
+					state.input_gamma[1] = 
+					state.input_gamma[2] = 4.;
+					state.input_alpha[0] = 
+					state.input_alpha[1] = 
+					state.input_alpha[2] = 0.;
+					state.output_gamma = 2.2;
+					state.brightness[0] = 
+					state.brightness[1] = 
+					state.brightness[2] = 0.;
+					state.contrast[0] = 
+					state.contrast[1] = 
+					state.contrast[2] = powf(255./280., 2.2/4.);
 				} else if (strcmp(optarg, "nds") == 0) {
-					state.matrix = MATRIX_NDS;
+					state.profile = PROFILE_NDS;
+
+					switch (state.profile_intent) {
+						case INTENT_SATURATION:            state.matrix = MATRIX_IDENTITY; break;
+						case INTENT_ABSOLUTE_COLORIMETRIC: state.matrix = MATRIX_NDS;      break;
+						default:                           state.matrix = MATRIX_NDS_D65;
+					}
+
 					state.input_trc = TRC_GAMMA;
 					state.input_gamma[0] = 
 					state.input_gamma[1] = 
 					state.input_gamma[2] = 2.2;
+					state.input_alpha[0] = 
+					state.input_alpha[1] = 
+					state.input_alpha[2] = 0.;
 					state.output_gamma = 2.2;
 					state.brightness[0] = 
 					state.brightness[1] = 
 					state.brightness[2] = powf(1./600., 1./2.2);
-					state.contrast[0] = 
-					state.contrast[1] = 
-					state.contrast[2] = 1. - state.brightness[0];
+
+					switch (state.profile_intent) {
+						case INTENT_PERCEPTUAL:
+							state.contrast[0] = 
+							state.contrast[1] = 
+							state.contrast[2] = powf(1./1.09, 1./2.2);
+							break;
+						default:
+							state.contrast[0] = 
+							state.contrast[1] = 
+							state.contrast[2] = 1.;
+					}
+
+					state.contrast[0] -= state.brightness[0];
+					state.contrast[1] -= state.brightness[1];
+					state.contrast[2] -= state.brightness[2];
 				} else if (strcmp(optarg, "palm") == 0) {
-					state.matrix = MATRIX_PALM;
+					state.profile = PROFILE_PALM;
+
+					switch (state.profile_intent) {
+						case INTENT_SATURATION:            state.matrix = MATRIX_IDENTITY; break;
+						case INTENT_ABSOLUTE_COLORIMETRIC: state.matrix = MATRIX_PALM;     break;
+						default:                           state.matrix = MATRIX_PALM_D65;
+					}
+
 					state.input_trc = TRC_GAMMA;
 					state.input_gamma[0] = 
 					state.input_gamma[1] = 
 					state.input_gamma[2] = 2.2;
+					state.input_alpha[0] = 
+					state.input_alpha[1] = 
+					state.input_alpha[2] = 0.;
 					state.output_gamma = 2.2;
 					state.brightness[0] = 
 					state.brightness[1] = 
 					state.brightness[2] = powf(1./75., 1./2.2);
-					state.contrast[0] = 
-					state.contrast[1] = 
-					state.contrast[2] = 1. - state.brightness[0];
+
+					switch (state.profile_intent) {
+						case INTENT_PERCEPTUAL:
+							state.contrast[0] = 
+							state.contrast[1] = 
+							state.contrast[2] = powf(1./1.125, 1./2.2);
+							break;
+						default:
+							state.contrast[0] = 
+							state.contrast[1] = 
+							state.contrast[2] = 1.;
+					}
+
+					state.contrast[0] -= state.brightness[0];
+					state.contrast[1] -= state.brightness[1];
+					state.contrast[2] -= state.brightness[2];
 				} else if (strcmp(optarg, "psp") == 0) {
-					state.matrix = MATRIX_PSP;
+					state.profile = PROFILE_PSP;
+
+					switch (state.profile_intent) {
+						case INTENT_SATURATION:            state.matrix = MATRIX_IDENTITY; break;
+						case INTENT_ABSOLUTE_COLORIMETRIC: state.matrix = MATRIX_PSP;      break;
+						default:                           state.matrix = MATRIX_PSP_D65;
+					}
+
 					state.input_trc = TRC_GAMMA;
 					state.input_gamma[0] = 
 					state.input_gamma[1] = 
 					state.input_gamma[2] = 2.2;
+					state.input_alpha[0] = 
+					state.input_alpha[1] = 
+					state.input_alpha[2] = 0.;
 					state.output_gamma = 2.2;
 					state.brightness[0] = 
 					state.brightness[1] = 
 					state.brightness[2] = powf(1./750., 1./2.2);
-					state.contrast[0] = 
-					state.contrast[1] = 
-					state.contrast[2] = 1. - state.brightness[0];
+
+					switch (state.profile_intent) {
+						case INTENT_PERCEPTUAL:
+							state.contrast[0] = 
+							state.contrast[1] = 
+							state.contrast[2] = powf(1./1.15, 1./2.2);
+							break;
+						default:
+							state.contrast[0] = 
+							state.contrast[1] = 
+							state.contrast[2] = 1.;
+					}
+
+					state.contrast[0] -= state.brightness[0];
+					state.contrast[1] -= state.brightness[1];
+					state.contrast[2] -= state.brightness[2];
 				}
+				break;
+			case OPT_MATRIX:
+				if (strcmp(optarg, "identity") == 0)
+					state.matrix = MATRIX_IDENTITY;
+				else if (strcmp(optarg, "gambatte") == 0)
+					state.matrix = MATRIX_GAMBATTE;
+				else if (strcmp(optarg, "gba") == 0)
+					state.matrix = MATRIX_GBA;
+				else if (strcmp(optarg, "gbasp") == 0)
+					state.matrix = MATRIX_GBASP_D65;
+				else if (strcmp(optarg, "gbc") == 0)
+					state.matrix = MATRIX_GBC;
+				else if (strcmp(optarg, "gbi") == 0)
+					state.matrix = MATRIX_GBI;
+				else if (strcmp(optarg, "hicolour") == 0)
+					state.matrix = MATRIX_HICOLOUR;
+				else if (strcmp(optarg, "higan") == 0)
+					state.matrix = MATRIX_HIGAN;
+				else if (strcmp(optarg, "nds") == 0)
+					state.matrix = MATRIX_NDS_D65;
+				else if (strcmp(optarg, "palm") == 0)
+					state.matrix = MATRIX_PALM_D65;
+				else if (strcmp(optarg, "psp") == 0)
+					state.matrix = MATRIX_PSP_D65;
+				else if (strcmp(optarg, "vba") == 0)
+					state.matrix = MATRIX_VBA;
 				break;
 			case OPT_INPUT_GAMMA:
 				switch (sscanf(optarg, "%g:%g:%g",
@@ -1713,6 +1943,14 @@ static void preinit(int argc, char **argv)
 					case 1: state.input_gamma[1] = state.input_gamma[0];
 					case 2: state.input_gamma[2] = state.input_gamma[0];
 					case 3: state.input_trc = TRC_GAMMA;
+				}
+				break;
+			case OPT_INPUT_ALPHA:
+				switch (sscanf(optarg, "%g:%g:%g",
+							&state.input_alpha[0], &state.input_alpha[1], &state.input_alpha[2])) {
+					case 1: state.input_alpha[1] = state.input_alpha[0];
+					case 2: state.input_alpha[2] = state.input_alpha[0];
+					case 3: state.input_trc = TRC_PIECEWISE;
 				}
 				break;
 			case OPT_OUTPUT_GAMMA:
@@ -1811,6 +2049,7 @@ static void preinit(int argc, char **argv)
 							#endif
 							xfbMode = VI_XFBMODE_SF;
 							state.zoom_auto = false;
+							state.zoom_ratio = 1.;
 							break;
 						case MODE_NON_PROGRESSIVE:
 							viMode  = VI_MONO | VI_INTERLACE | VI_ENHANCED | VI_CLOCK_54MHZ;

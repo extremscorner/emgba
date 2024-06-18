@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2015-2022, Extrems' Corner.org
+ * Copyright (c) 2015-2024, Extrems' Corner.org
  * 
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -17,7 +17,7 @@ static syswd_t alarm = SYS_WD_NULL;
 
 ctr_state_t ctr = {
 	.sv.sd = INVALID_SOCKET,
-	.sv.nb = 1,
+	.sv.nonblock = 1,
 	.sv.sin.sin_family = AF_INET,
 	.sv.sin.sin_port = 15708,
 	.sv.sin.sin_addr.s_addr = INADDR_ANY,
@@ -91,7 +91,7 @@ bool CTRInit(void)
 
 	if (ctr.sv.sd == INVALID_SOCKET)
 		goto fail;
-	if (net_ioctl(ctr.sv.sd, FIONBIO, &ctr.sv.nb) < 0)
+	if (net_ioctl(ctr.sv.sd, FIONBIO, &ctr.sv.nonblock) < 0)
 		goto fail;
 	if (net_bind(ctr.sv.sd, (struct sockaddr *)&ctr.sv.sin, ctr.sv.sinlen) < 0)
 		goto fail;

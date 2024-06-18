@@ -2,8 +2,6 @@
 --cursor=point-srgb.tpl.gz
 --overlay=frame-srgb.tpl.gz
 --dither=none
---matrix=identity
---input-gamma=1.
---output-gamma=1.
+--profile=srgb
 --contrast=.78125
 --
