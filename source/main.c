@@ -1020,7 +1020,7 @@ static void _drawFrame(struct mGUIRunner *runner, bool faded)
 	dispsize[1] = GX_EndDispList();
 }
 
-static void _drawScreenshot(struct mGUIRunner *runner, const color_t *pixels, unsigned width, unsigned height, bool faded)
+static void _drawScreenshot(struct mGUIRunner *runner, const mColor *pixels, unsigned width, unsigned height, bool faded)
 {
 	rect_t planar_src   = {0, 0, width, height};
 	rect_t prescale_src = {0, 0, planar_src.w * state.scale, planar_src.h * state.scale};

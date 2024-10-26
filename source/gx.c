@@ -415,8 +415,8 @@ void *GXOpenFile(const char *file)
 	gzFile zfp = gzopen(file, "rb");
 
 	return funopen(zfp,
-		(int (*)(void *, char *, int))gzread,
-		(int (*)(void *, const char *, int))gzwrite,
+		(int (*)(void *, char *, size_t))gzread,
+		(int (*)(void *, const char *, size_t))gzwrite,
 		(fpos_t (*)(void *, fpos_t, int))gzseek,
 		(int (*)(void *))gzclose);
 }

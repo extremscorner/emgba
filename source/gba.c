@@ -98,7 +98,7 @@ static uint32_t GBAEncrypt(uint32_t addr, uint32_t val, uint32_t *key)
 {
 	*key = *key * bswap32('Kawa') + 1;
 	val ^= *key;
-	val ^= ~addr + 1;
+	val ^= -addr;
 	val ^= bswap32(' by ');
 	return val;
 }
@@ -126,13 +126,13 @@ static void *thread_func(void *arg)
 				case SI_GC_CONTROLLER:
 				case SI_GC_WAVEBIRD:
 					if (gc_controller.status[chan].err == PAD_ERR_NO_CONTROLLER) {
-						gc_controller.status[chan].err =  PAD_ERR_NOT_READY;
+						gc_controller.status[chan].err  = PAD_ERR_NOT_READY;
 						reset |= SI_CHAN_BIT(chan);
 					}
 					break;
 				case SI_GC_STEERING:
 					if (gc_steering.status[chan].err == SI_STEERING_ERR_NO_CONTROLLER)
-						gc_steering.status[chan].err =  SI_ResetSteering(chan);
+						gc_steering.status[chan].err  = SI_ResetSteering(chan);
 					break;
 				case SI_N64_CONTROLLER:
 					N64_ReadAsync(chan, &n64_controller.status[chan], NULL);
