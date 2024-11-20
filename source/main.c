@@ -1289,8 +1289,10 @@ static uint16_t _pollGameInput(struct mGUIRunner *runner)
 
 static void preinit(int argc, char **argv)
 {
-	for (int chn = 0; chn < EXI_CHANNEL_2; chn++)
-		CON_EnableGecko(chn, FALSE);
+	CON_EnableBarnacle(EXI_CHANNEL_0, EXI_DEVICE_1);
+
+	for (int chan = 0; chan < EXI_CHANNEL_2; chan++)
+		CON_EnableGecko(chan, false);
 
 	puts("Enhanced mGBA © 2015-2024 Extrems' Corner.org");
 
