@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2015-2024, Extrems' Corner.org
+ * Copyright (c) 2015-2025, Extrems' Corner.org
  * 
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -102,6 +102,8 @@ void GXFontAllocState(void)
 	GX_LoadProjectionMtx(projection, GX_ORTHOGRAPHIC);
 	GX_SetCurrentMtx(GX_PNMTX1);
 
+	GX_LoadTexObjPreloaded(&texobj, &texregion, GX_TEXMAP0);
+
 	dispsize = GX_EndDispList();
 	displist = realloc_in_place(displist, dispsize);
 }
@@ -141,8 +143,11 @@ void GUIFontDrawGlyph(struct GUIFont *font, int x, int y, uint32_t color, uint32
 	int32_t xpos, ypos, width;
 
 	SYS_GetFontTexture(glyph, &image, &xpos, &ypos, &width);
-	GX_InitTexObjData(&texobj, image);
-	GX_LoadTexObjPreloaded(&texobj, &texregion, GX_TEXMAP0);
+
+	if (GX_GetTexObjData(&texobj) != (void *)MEM_VIRTUAL_TO_PHYSICAL(image)) {
+		GX_InitTexObjData(&texobj, image);
+		GX_LoadTexObjPreloaded(&texobj, &texregion, GX_TEXMAP0);
+	}
 
 	GXFontDrawCell(x, y, color, xpos, ypos);
 }

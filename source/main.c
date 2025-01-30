@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2015-2024, Extrems' Corner.org
+ * Copyright (c) 2015-2025, Extrems' Corner.org
  * 
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -253,7 +253,10 @@ static uint32_t _pollInput(const struct mInputMap *map)
 		WPADData *data = WPAD_Data(chan);
 
 		if (!data->ir.raw_valid && data->exp.type == WPAD_EXP_NONE) {
-			keys |= mInputMapKeyBits(map, 'wm\0\0', data->btns_h & 0xFFFF, 0);
+			if (data->orient.roll <= 0.)
+				keys |= mInputMapKeyBits(map, 'wm\0\0', data->btns_h & 0xFFFF, 0);
+			else
+				keys |= mInputMapKeyBits(map, 'wmr\0', data->btns_h & 0xFFFF, 0);
 		} else {
 			keys |= mInputMapKeyBits(map, 'wmnc', data->btns_h & 0xFFFF, 0);
 
@@ -453,57 +456,63 @@ static struct mRumble rumble = {
 
 static void _sampleRotation(struct mRotationSource *source)
 {
+	state.rotation = RadToDeg(ctr.data.orient.roll);
+
 	#ifdef HW_RVL
 	for (int chan = 0; chan < WPAD_MAX_WIIMOTES; chan++) {
 		WPADData *data = WPAD_Data(chan);
 
 		if (data->data_present & WPAD_DATA_ACCEL) {
 			if (!data->ir.raw_valid && data->exp.type == WPAD_EXP_NONE)
-				state.rotation = -data->orient.pitch;
+				state.rotation = data->orient.roll <= 0. ? -data->orient.pitch : data->orient.pitch;
 			else
-				state.rotation =  data->ir.raw_valid ? data->ir.angle : data->orient.roll;
-			return;
+				state.rotation = data->ir.raw_valid ? data->ir.angle : data->orient.roll;
+			break;
 		}
 	}
 	#endif
-
-	state.rotation = RadToDeg(ctr.data.orient.roll);
 }
 
 static int32_t _readTiltX(struct mRotationSource *source)
 {
+	float tiltX = ctr.data.gforce.x;
+
 	#ifdef HW_RVL
 	for (int chan = 0; chan < WPAD_MAX_WIIMOTES; chan++) {
 		WPADData *data = WPAD_Data(chan);
 
 		if (data->data_present & WPAD_DATA_ACCEL) {
 			if (!data->ir.raw_valid && data->exp.type == WPAD_EXP_NONE)
-				return -data->gforce.y * 0xE0p21;
+				tiltX = data->orient.roll <= 0. ? -data->gforce.y : data->gforce.y;
 			else
-				return  data->gforce.x * 0xE0p21;
+				tiltX = data->gforce.x;
+			break;
 		}
 	}
 	#endif
 
-	return ctr.data.gforce.x * 0xE0p21;
+	return tiltX * 0xE0p21;
 }
 
 static int32_t _readTiltY(struct mRotationSource *source)
 {
+	float tiltY = ctr.data.gforce.y;
+
 	#ifdef HW_RVL
 	for (int chan = 0; chan < WPAD_MAX_WIIMOTES; chan++) {
 		WPADData *data = WPAD_Data(chan);
 
 		if (data->data_present & WPAD_DATA_ACCEL) {
 			if (!data->ir.raw_valid && data->exp.type == WPAD_EXP_NONE)
-				return -data->gforce.x * 0xE0p21;
+				tiltY = data->orient.roll <= 0. ? -data->gforce.x : data->gforce.x;
 			else
-				return  data->gforce.y * 0xE0p21;
+				tiltY = data->gforce.y;
+			break;
 		}
 	}
 	#endif
 
-	return ctr.data.gforce.y * 0xE0p21;
+	return tiltY * 0xE0p21;
 }
 
 static struct mRotationSource rotation = {
@@ -604,6 +613,14 @@ static void _setup(struct mGUIRunner *runner)
 	mInputBindKey(&runner->params.keyMap, 'wm\0\0', __builtin_ctz(WPAD_BUTTON_LEFT), GUI_INPUT_DOWN);
 	mInputBindKey(&runner->params.keyMap, 'wm\0\0', __builtin_ctz(WPAD_BUTTON_UP), GUI_INPUT_LEFT);
 	mInputBindKey(&runner->params.keyMap, 'wm\0\0', __builtin_ctz(WPAD_BUTTON_DOWN), GUI_INPUT_RIGHT);
+
+	mInputBindKey(&runner->params.keyMap, 'wmr\0', __builtin_ctz(WPAD_BUTTON_2), GUI_INPUT_SELECT);
+	mInputBindKey(&runner->params.keyMap, 'wmr\0', __builtin_ctz(WPAD_BUTTON_1), GUI_INPUT_BACK);
+	mInputBindKey(&runner->params.keyMap, 'wmr\0', __builtin_ctz(WPAD_BUTTON_HOME), GUI_INPUT_CANCEL);
+	mInputBindKey(&runner->params.keyMap, 'wmr\0', __builtin_ctz(WPAD_BUTTON_LEFT), GUI_INPUT_UP);
+	mInputBindKey(&runner->params.keyMap, 'wmr\0', __builtin_ctz(WPAD_BUTTON_RIGHT), GUI_INPUT_DOWN);
+	mInputBindKey(&runner->params.keyMap, 'wmr\0', __builtin_ctz(WPAD_BUTTON_DOWN), GUI_INPUT_LEFT);
+	mInputBindKey(&runner->params.keyMap, 'wmr\0', __builtin_ctz(WPAD_BUTTON_UP), GUI_INPUT_RIGHT);
 
 	mInputBindKey(&runner->params.keyMap, 'wmnc', __builtin_ctz(WPAD_BUTTON_A), GUI_INPUT_SELECT);
 	mInputBindKey(&runner->params.keyMap, 'wmnc', __builtin_ctz(WPAD_BUTTON_B), GUI_INPUT_BACK);
@@ -804,6 +821,17 @@ static void _gameLoaded(struct mGUIRunner *runner)
 	mInputBindKey(&runner->core->inputMap, 'wm\0\0', __builtin_ctz(WPAD_BUTTON_LEFT), GBA_KEY_DOWN);
 	mInputBindKey(&runner->core->inputMap, 'wm\0\0', __builtin_ctz(WPAD_BUTTON_A), GBA_KEY_R);
 	mInputBindKey(&runner->core->inputMap, 'wm\0\0', __builtin_ctz(WPAD_BUTTON_B), GBA_KEY_L);
+
+	mInputBindKey(&runner->core->inputMap, 'wmr\0', __builtin_ctz(WPAD_BUTTON_2), GBA_KEY_A);
+	mInputBindKey(&runner->core->inputMap, 'wmr\0', __builtin_ctz(WPAD_BUTTON_1), GBA_KEY_B);
+	mInputBindKey(&runner->core->inputMap, 'wmr\0', __builtin_ctz(WPAD_BUTTON_MINUS), GBA_KEY_SELECT);
+	mInputBindKey(&runner->core->inputMap, 'wmr\0', __builtin_ctz(WPAD_BUTTON_PLUS), GBA_KEY_START);
+	mInputBindKey(&runner->core->inputMap, 'wmr\0', __builtin_ctz(WPAD_BUTTON_DOWN), GBA_KEY_LEFT);
+	mInputBindKey(&runner->core->inputMap, 'wmr\0', __builtin_ctz(WPAD_BUTTON_UP), GBA_KEY_RIGHT);
+	mInputBindKey(&runner->core->inputMap, 'wmr\0', __builtin_ctz(WPAD_BUTTON_RIGHT), GBA_KEY_DOWN);
+	mInputBindKey(&runner->core->inputMap, 'wmr\0', __builtin_ctz(WPAD_BUTTON_LEFT), GBA_KEY_UP);
+	mInputBindKey(&runner->core->inputMap, 'wmr\0', __builtin_ctz(WPAD_BUTTON_A), GBA_KEY_R);
+	mInputBindKey(&runner->core->inputMap, 'wmr\0', __builtin_ctz(WPAD_BUTTON_B), GBA_KEY_L);
 
 	mInputBindKey(&runner->core->inputMap, 'wmnc', __builtin_ctz(WPAD_BUTTON_A), GBA_KEY_A);
 	mInputBindKey(&runner->core->inputMap, 'wmnc', __builtin_ctz(WPAD_BUTTON_B), GBA_KEY_B);
@@ -1222,7 +1250,10 @@ static uint16_t _pollGameInput(struct mGUIRunner *runner)
 		WPADData *data = WPAD_Data(chan);
 
 		if (!data->ir.raw_valid && data->exp.type == WPAD_EXP_NONE) {
-			keys |= mInputMapKeyBits(&runner->core->inputMap, 'wm\0\0', data->btns_h & 0xFFFF, 0);
+			if (data->orient.roll <= 0.)
+				keys |= mInputMapKeyBits(&runner->core->inputMap, 'wm\0\0', data->btns_h & 0xFFFF, 0);
+			else
+				keys |= mInputMapKeyBits(&runner->core->inputMap, 'wmr\0', data->btns_h & 0xFFFF, 0);
 		} else {
 			keys |= mInputMapKeyBits(&runner->core->inputMap, 'wmnc', data->btns_h & 0xFFFF, 0);
 
@@ -1289,12 +1320,10 @@ static uint16_t _pollGameInput(struct mGUIRunner *runner)
 
 static void preinit(int argc, char **argv)
 {
-	CON_EnableBarnacle(EXI_CHANNEL_0, EXI_DEVICE_1);
-
 	for (int chan = 0; chan < EXI_CHANNEL_2; chan++)
 		CON_EnableGecko(chan, false);
 
-	puts("Enhanced mGBA © 2015-2024 Extrems' Corner.org");
+	puts("Enhanced mGBA © 2015-2025 Extrems' Corner.org");
 
 	if (fatInitDefault()) {
 		mkdir("/mGBA", 0755);
@@ -2373,8 +2402,31 @@ int main(int argc, char **argv)
 				.nKeys = 18
 			},
 			{
-				.name = "Wii Remote",
+				.name = "Wii Remote (L)",
 				.id = 'wm\0\0',
+				.keyNames = (const char *[]) {
+					"Left",
+					"Right",
+					"Down",
+					"Up",
+					"+",
+					NULL,
+					NULL,
+					NULL,
+					"2",
+					"1",
+					"B",
+					"A",
+					"-",
+					NULL,
+					NULL,
+					"Home"
+				},
+				.nKeys = 16
+			},
+			{
+				.name = "Wii Remote (R)",
+				.id = 'wmr\0',
 				.keyNames = (const char *[]) {
 					"Left",
 					"Right",

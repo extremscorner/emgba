@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2015-2024, Extrems' Corner.org
+ * Copyright (c) 2015-2025, Extrems' Corner.org
  * 
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -29,7 +29,7 @@
 #define SYSCONF_GetProgressiveScan() CONF_GetProgressiveScan() > CONF_ERR_OK
 #define SYSCONF_GetVideoMode()       CONF_GetVideo()
 #define SYSCONF_GetEuRGB60()         CONF_GetEuRGB60() > CONF_ERR_OK
-#define SYSCONF_GetDisplayOffsetH()  ({ int8_t offset; CONF_GetDisplayOffsetH(&offset); offset; })
+#define SYSCONF_GetDisplayOffsetH()  ({ int8_t offset = 0; CONF_GetDisplayOffsetH(&offset); offset; })
 #endif
 
 #endif /* GBI_SYSCONF_H */
