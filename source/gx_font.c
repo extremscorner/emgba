@@ -55,10 +55,8 @@ void GXFontAllocState(void)
 		-screen.y - screen.h / 2, screen.y + screen.h / 2,
 		-screen.x - screen.w / 2, screen.x + screen.w / 2, 0., 1.);
 
-	if (SYS_SetFontEncoding(SYS_FONTENC_ANSI) == SYS_FONTENC_ANSI)
-		fontdata = SYS_AllocArenaMemHi(SYS_FONTSIZE_ANSI, 32);
-	else
-		fontdata = SYS_AllocArenaMemHi(SYS_FONTSIZE_SJIS, 32);
+	SYS_SetFontEncoding(SYS_FONTENC_ANSI);
+	fontdata = SYS_AllocArenaMemHi(SYS_FONTSIZE_ANSI, 32);
 
 	SYS_InitFont(fontdata);
 	fontdata->sheet_image = (fontdata->sheet_image + 31) & ~31;

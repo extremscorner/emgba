@@ -16,14 +16,19 @@ size_t romBufferSize;
 static void __attribute__((constructor)) allocateRomBuffer(void)
 {
 	#ifdef HW_DOL
-	AR_Init(NULL, 0);
-	ARQ_Init();
+	romBufferSize = 32 << 20;
+	romBuffer = SYS_AllocArenaMem1Hi(romBufferSize, 32);
 
-	romBufferSize = AR_GetSize();
-	romBuffer = VM_Init(romBufferSize, 8 << 20);
+	if (!romBuffer) {
+		AR_Init(NULL, 0);
+		ARQ_Init();
+
+		romBufferSize = AR_GetSize();
+		romBuffer = VM_Init(romBufferSize, 8 << 20);
+	}
 	#else
 	romBufferSize = 32 << 20;
-	romBuffer = SYS_AllocArena2MemLo(romBufferSize, 32);
+	romBuffer = SYS_AllocArenaMem2Lo(romBufferSize, 32);
 	#endif
 }
 

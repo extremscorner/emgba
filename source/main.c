@@ -1320,6 +1320,9 @@ static uint16_t _pollGameInput(struct mGUIRunner *runner)
 
 static void preinit(int argc, char **argv)
 {
+	if ((SYS_GetConsoleType() & SYS_CONSOLE_MASK) == SYS_CONSOLE_DEVELOPMENT)
+		CON_EnableBarnacle(EXI_CHANNEL_0, EXI_DEVICE_1);
+
 	for (int chan = 0; chan < EXI_CHANNEL_2; chan++)
 		CON_EnableGecko(chan, false);
 
