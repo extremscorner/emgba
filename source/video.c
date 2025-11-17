@@ -119,8 +119,7 @@ void VideoSetup(uint32_t tvMode, uint32_t viMode, uint32_t xfbMode)
 
 	VIDEO_SetBlack(false);
 	VIDEO_Flush();
-	VIDEO_WaitVSync();
-	VIDEO_WaitVSync();
+	VIDEO_WaitForFlush();
 
 	switch (VIDEO_GetCurrentTvMode()) {
 		case VI_HDCUSTOM:
@@ -167,6 +166,7 @@ void VideoSetup(uint32_t tvMode, uint32_t viMode, uint32_t xfbMode)
 	screen.w = (screen.w + 1) & ~1;
 	screen.h = (screen.h + 1) & ~1;
 
+	viclock.hz = VIDEO_GetRetraceRate();
 	VIDEO_SetPreRetraceCallback(vblank_cb);
 }
 
@@ -174,8 +174,7 @@ void VideoBlackOut(void)
 {
 	VIDEO_SetBlack(true);
 	VIDEO_Flush();
-	VIDEO_WaitVSync();
-	VIDEO_WaitVSync();
+	VIDEO_WaitForFlush();
 }
 
 void *VideoGetFramebuffer(uint32_t *index)

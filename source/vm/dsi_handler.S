@@ -13,33 +13,33 @@
 dsi_exceptionhandler:
 	stw		%r11,GPR1_OFFSET(%sp)
 	stmw	%r13,GPR13_OFFSET(%sp)
-	psq_st	%f0,PSR0_OFFSET(%sp),0,0
+	psq_st	%f0,PSFPR0_OFFSET(%sp),0,0
 	stfd	%f0,FPR0_OFFSET(%sp)
-	psq_st	%f1,PSR1_OFFSET(%sp),0,0
+	psq_st	%f1,PSFPR1_OFFSET(%sp),0,0
 	stfd	%f1,FPR1_OFFSET(%sp)
-	psq_st	%f2,PSR2_OFFSET(%sp),0,0
+	psq_st	%f2,PSFPR2_OFFSET(%sp),0,0
 	stfd	%f2,FPR2_OFFSET(%sp)
-	psq_st	%f3,PSR3_OFFSET(%sp),0,0
+	psq_st	%f3,PSFPR3_OFFSET(%sp),0,0
 	stfd	%f3,FPR3_OFFSET(%sp)
-	psq_st	%f4,PSR4_OFFSET(%sp),0,0
+	psq_st	%f4,PSFPR4_OFFSET(%sp),0,0
 	stfd	%f4,FPR4_OFFSET(%sp)
-	psq_st	%f5,PSR5_OFFSET(%sp),0,0
+	psq_st	%f5,PSFPR5_OFFSET(%sp),0,0
 	stfd	%f5,FPR5_OFFSET(%sp)
-	psq_st	%f6,PSR6_OFFSET(%sp),0,0
+	psq_st	%f6,PSFPR6_OFFSET(%sp),0,0
 	stfd	%f6,FPR6_OFFSET(%sp)
-	psq_st	%f7,PSR7_OFFSET(%sp),0,0
+	psq_st	%f7,PSFPR7_OFFSET(%sp),0,0
 	stfd	%f7,FPR7_OFFSET(%sp)
-	psq_st	%f8,PSR8_OFFSET(%sp),0,0
+	psq_st	%f8,PSFPR8_OFFSET(%sp),0,0
 	stfd	%f8,FPR8_OFFSET(%sp)
-	psq_st	%f9,PSR9_OFFSET(%sp),0,0
+	psq_st	%f9,PSFPR9_OFFSET(%sp),0,0
 	stfd	%f9,FPR9_OFFSET(%sp)
-	psq_st	%f10,PSR10_OFFSET(%sp),0,0
+	psq_st	%f10,PSFPR10_OFFSET(%sp),0,0
 	stfd	%f10,FPR10_OFFSET(%sp)
-	psq_st	%f11,PSR11_OFFSET(%sp),0,0
+	psq_st	%f11,PSFPR11_OFFSET(%sp),0,0
 	stfd	%f11,FPR11_OFFSET(%sp)
-	psq_st	%f12,PSR12_OFFSET(%sp),0,0
+	psq_st	%f12,PSFPR12_OFFSET(%sp),0,0
 	stfd	%f12,FPR12_OFFSET(%sp)
-	psq_st	%f13,PSR13_OFFSET(%sp),0,0
+	psq_st	%f13,PSFPR13_OFFSET(%sp),0,0
 	stfd	%f13,FPR13_OFFSET(%sp)
 	mffs	%f0
 	stfd	%f0,FPSCR_OFFSET(%sp)
@@ -55,33 +55,33 @@ dsi_exceptionhandler:
 
 1:	lfd		%f0,FPSCR_OFFSET(%sp)
 	mtfsf	0xFF,%f0
-	psq_l	%f13,PSR13_OFFSET(%sp),0,0
+	psq_l	%f13,PSFPR13_OFFSET(%sp),0,0
 	lfd		%f13,FPR13_OFFSET(%sp)
-	psq_l	%f12,PSR12_OFFSET(%sp),0,0
+	psq_l	%f12,PSFPR12_OFFSET(%sp),0,0
 	lfd		%f12,FPR12_OFFSET(%sp)
-	psq_l	%f11,PSR11_OFFSET(%sp),0,0
+	psq_l	%f11,PSFPR11_OFFSET(%sp),0,0
 	lfd		%f11,FPR11_OFFSET(%sp)
-	psq_l	%f10,PSR10_OFFSET(%sp),0,0
+	psq_l	%f10,PSFPR10_OFFSET(%sp),0,0
 	lfd		%f10,FPR10_OFFSET(%sp)
-	psq_l	%f9,PSR9_OFFSET(%sp),0,0
+	psq_l	%f9,PSFPR9_OFFSET(%sp),0,0
 	lfd		%f9,FPR9_OFFSET(%sp)
-	psq_l	%f8,PSR8_OFFSET(%sp),0,0
+	psq_l	%f8,PSFPR8_OFFSET(%sp),0,0
 	lfd		%f8,FPR8_OFFSET(%sp)
-	psq_l	%f7,PSR7_OFFSET(%sp),0,0
+	psq_l	%f7,PSFPR7_OFFSET(%sp),0,0
 	lfd		%f7,FPR7_OFFSET(%sp)
-	psq_l	%f6,PSR6_OFFSET(%sp),0,0
+	psq_l	%f6,PSFPR6_OFFSET(%sp),0,0
 	lfd		%f6,FPR6_OFFSET(%sp)
-	psq_l	%f5,PSR5_OFFSET(%sp),0,0
+	psq_l	%f5,PSFPR5_OFFSET(%sp),0,0
 	lfd		%f5,FPR5_OFFSET(%sp)
-	psq_l	%f4,PSR4_OFFSET(%sp),0,0
+	psq_l	%f4,PSFPR4_OFFSET(%sp),0,0
 	lfd		%f4,FPR4_OFFSET(%sp)
-	psq_l	%f3,PSR3_OFFSET(%sp),0,0
+	psq_l	%f3,PSFPR3_OFFSET(%sp),0,0
 	lfd		%f3,FPR3_OFFSET(%sp)
-	psq_l	%f2,PSR2_OFFSET(%sp),0,0
+	psq_l	%f2,PSFPR2_OFFSET(%sp),0,0
 	lfd		%f2,FPR2_OFFSET(%sp)
-	psq_l	%f1,PSR1_OFFSET(%sp),0,0
+	psq_l	%f1,PSFPR1_OFFSET(%sp),0,0
 	lfd		%f1,FPR1_OFFSET(%sp)
-	psq_l	%f0,PSR0_OFFSET(%sp),0,0
+	psq_l	%f0,PSFPR0_OFFSET(%sp),0,0
 	lfd		%f0,FPR0_OFFSET(%sp)
 	lwz		%r0,CR_OFFSET(%sp)
 	mtcr	%r0

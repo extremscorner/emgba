@@ -62,7 +62,7 @@ void GXInit(void)
 		case 22: GX_SetDispCopyGamma(GX_GM_2_2); break;
 	}
 
-	for (int i = GX_TEXCOORD0; i < GX_MAXCOORD; i++)
+	for (int i = GX_TEXCOORD0; i < GX_MAX_TEXCOORD; i++)
 		GX_SetTexCoordScaleManually(i, GX_TRUE, 1, 1);
 
 	for (int i = 0; i < 10; i++) {
@@ -80,8 +80,8 @@ void GXInit(void)
 		float y = i / 3 - 1;
 
 		if (i % 2 == 0) {
-			x /= 2;
-			y /= 2;
+			x /= 2.;
+			y /= 2.;
 		}
 
 		x += 1./64.;
@@ -146,6 +146,12 @@ static double trc_piecewise(int ch, double f) {
 	return copysign(L, f);
 }
 
+static double trc_gamma22(int ch, double f) {
+	double V = fabs(f);
+	double L = pow(V, 2.2);
+	return copysign(L, f);
+}
+
 static double trc_iec61966(int ch, double f) {
 	double V = fabs(f);
 	double L = V <= .04045 ? V / 12.92 : pow((V + .055) / 1.055, 2.4);
@@ -168,6 +174,7 @@ static double (*trc_funcs[])(int, double) = {
 	trc_linear,
 	trc_gamma,
 	trc_piecewise,
+	trc_gamma22,
 	trc_iec61966,
 	trc_itu709,
 	trc_smpte240

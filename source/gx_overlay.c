@@ -54,8 +54,8 @@ void GXOverlayAllocState(void)
 {
 	Mtx44 projection;
 	guOrtho(projection,
-		-screen.y - screen.h / 2, screen.y + screen.h / 2,
-		-screen.x - screen.w / 2, screen.x + screen.w / 2, 0., 1.);
+		-screen.y - screen.h / 2., screen.y + screen.h / 2.,
+		-screen.x - screen.w / 2., screen.x + screen.w / 2., 0., 1.);
 
 	displist = GXAllocBuffer(GX_FIFO_MINSIZE);
 	GX_BeginDispList(displist, GX_FIFO_MINSIZE);
@@ -72,7 +72,7 @@ void GXOverlayAllocState(void)
 
 	GX_SetTevSwapModeTable(GX_TEV_SWAP0, GX_CH_RED, GX_CH_GREEN, GX_CH_BLUE, GX_CH_ALPHA);
 
-	GX_SetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLORNULL);
+	GX_SetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR_NULL);
 	GX_SetTevColorIn(GX_TEVSTAGE0, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO, GX_CC_TEXC);
 	GX_SetTevColorOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
 	GX_SetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO, GX_CA_TEXA);

@@ -64,8 +64,8 @@ state_t default_state, state = {
 	.scaler         = SCALER_AREA,
 	.profile_intent = INTENT_PERCEPTUAL,
 	.profile        = PROFILE_GBI,
-	.matrix         = MATRIX_GBI,
-	.input_trc      = TRC_GAMMA,
+	.input_matrix   = MATRIX_GBI,
+	.input_trc      = TRC_GAMMA22,
 	.input_gamma    = { 2.2, 2.2, 2.2 },
 	.output_gamma   = 2.2,
 	.contrast       = { 1., 1., 1. },
@@ -84,7 +84,7 @@ static void asndlib_cb(void)
 }
 
 static sem_t semaphore[2] = { LWP_SEM_NULL, LWP_SEM_NULL };
-static syswd_t watchdog;
+static syswd_t watchdog = SYS_WD_NULL;
 
 static void alarm_cb(syswd_t alarm, void *arg)
 {
@@ -109,8 +109,8 @@ static void _drawStart(void)
 		LWP_SemWait(semaphore[0]);
 	LWP_SemWait(semaphore[1]);
 
-	state.retrace = VIDEO_GetRetraceCount() + 1;
-	state.field   = VIDEO_GetCurrentField() ^ 1;
+	state.retrace = VIDEO_GetRetraceCount();
+	state.field   = rmode.field_rendering ? VIDEO_GetNextField() : VI_FRAME;
 
 	state.current = STATE_INIT;
 
@@ -369,13 +369,12 @@ static void _guiPrepare(void)
 {
 	GX_BeginDispList(displist[2], GX_FIFO_MINSIZE);
 
-	GX_SetViewportJitter(viewport.x + state.offset.x, viewport.y + state.offset.y, viewport.w, viewport.h, 0., 1.,
-		rmode.field_rendering ? state.field : viewport.h % 2);
+	GX_SetViewportJitter(viewport.x + state.offset.x, viewport.y + state.offset.y + (viewport.h % 2) / 2., viewport.w, viewport.h, 0., 1., state.field);
 
 	Mtx viewmodel;
 	guMtxTrans(viewmodel,
-		-GBA_VIDEO_HORIZONTAL_PIXELS * state.zoom.x / 2,
-		-GBA_VIDEO_VERTICAL_PIXELS   * state.zoom.y / 2, 0);
+		-GBA_VIDEO_HORIZONTAL_PIXELS * state.zoom.x / 2.,
+		-GBA_VIDEO_VERTICAL_PIXELS   * state.zoom.y / 2., 0.);
 	GX_LoadPosMtxImm(viewmodel, GX_PNMTX1);
 }
 
@@ -1034,8 +1033,7 @@ static void _drawFrame(struct mGUIRunner *runner, bool faded)
 
 	GX_BeginDispList(displist[0], GX_FIFO_MINSIZE);
 
-	GX_SetViewportJitter(viewport.x + state.offset.x, viewport.y + state.offset.y, viewport.w, viewport.h, 0., 1.,
-		rmode.field_rendering ? state.field : viewport.h % 2);
+	GX_SetViewportJitter(viewport.x + state.offset.x, viewport.y + state.offset.y + (viewport.h % 2) / 2., viewport.w, viewport.h, 0., 1., state.field);
 
 	GXPreviewDrawRect(prescale_surface.obj, convert_surface.rect, prescale_surface.rect);
 
@@ -1124,8 +1122,7 @@ static void _drawScreenshot(struct mGUIRunner *runner, const mColor *pixels, uns
 
 	GX_BeginDispList(displist[0], GX_FIFO_MINSIZE);
 
-	GX_SetViewportJitter(viewport.x + state.offset.x, viewport.y + state.offset.y, viewport.w, viewport.h, 0., 1.,
-		rmode.field_rendering ? state.field : viewport.h % 2);
+	GX_SetViewportJitter(viewport.x + state.offset.x, viewport.y + state.offset.y + (viewport.h % 2) / 2., viewport.w, viewport.h, 0., 1., state.field);
 
 	GXPreviewDrawRect(prescale_surface.obj, convert_surface.rect, prescale_surface.rect);
 
@@ -1323,7 +1320,7 @@ static void preinit(int argc, char **argv)
 	if ((SYS_GetConsoleType() & SYS_CONSOLE_MASK) == SYS_CONSOLE_DEVELOPMENT)
 		CON_EnableBarnacle(EXI_CHANNEL_0, EXI_DEVICE_1);
 
-	for (int chan = 0; chan < EXI_CHANNEL_2; chan++)
+	for (int chan = 0; chan < EXI_CHANNEL_MAX; chan++)
 		CON_EnableGecko(chan, false);
 
 	puts("Enhanced mGBA © 2015-2025 Extrems' Corner.org");
@@ -1644,7 +1641,7 @@ static void preinit(int argc, char **argv)
 			case OPT_PROFILE:
 				if (strcmp(optarg, "srgb") == 0) {
 					state.profile = PROFILE_SRGB;
-					state.matrix = MATRIX_IDENTITY;
+					state.input_matrix = MATRIX_IDENTITY;
 					state.input_trc = TRC_LINEAR;
 					state.input_gamma[0] = 
 					state.input_gamma[1] = 
@@ -1662,8 +1659,8 @@ static void preinit(int argc, char **argv)
 				} else if (strcmp(optarg, "gambatte") == 0) {
 					state.profile = PROFILE_GAMBATTE;
 					if (state.profile_intent == INTENT_SATURATION)
-						state.matrix = MATRIX_IDENTITY;
-					else state.matrix = MATRIX_GAMBATTE;
+						state.input_matrix = MATRIX_IDENTITY;
+					else state.input_matrix = MATRIX_GAMBATTE;
 					state.input_trc = TRC_LINEAR;
 					state.input_gamma[0] = 
 					state.input_gamma[1] = 
@@ -1681,8 +1678,8 @@ static void preinit(int argc, char **argv)
 				} else if (strcmp(optarg, "gba") == 0) {
 					state.profile = PROFILE_GBA;
 					if (state.profile_intent == INTENT_SATURATION)
-						state.matrix = MATRIX_IDENTITY;
-					else state.matrix = MATRIX_GBA;
+						state.input_matrix = MATRIX_IDENTITY;
+					else state.input_matrix = MATRIX_GBA;
 					state.input_trc = TRC_GAMMA;
 					state.input_gamma[0] = 
 					state.input_gamma[1] = 
@@ -1714,9 +1711,9 @@ static void preinit(int argc, char **argv)
 					state.profile = PROFILE_GBASP;
 
 					switch (state.profile_intent) {
-						case INTENT_SATURATION:            state.matrix = MATRIX_IDENTITY;  break;
-						case INTENT_ABSOLUTE_COLORIMETRIC: state.matrix = MATRIX_GBASP;     break;
-						default:                           state.matrix = MATRIX_GBASP_D65;
+						case INTENT_SATURATION:            state.input_matrix = MATRIX_IDENTITY;  break;
+						case INTENT_ABSOLUTE_COLORIMETRIC: state.input_matrix = MATRIX_GBASP;     break;
+						default:                           state.input_matrix = MATRIX_GBASP_D65;
 					}
 
 					state.input_trc = TRC_GAMMA;
@@ -1749,8 +1746,8 @@ static void preinit(int argc, char **argv)
 				} else if (strcmp(optarg, "gbc") == 0) {
 					state.profile = PROFILE_GBC;
 					if (state.profile_intent == INTENT_SATURATION)
-						state.matrix = MATRIX_IDENTITY;
-					else state.matrix = MATRIX_GBC;
+						state.input_matrix = MATRIX_IDENTITY;
+					else state.input_matrix = MATRIX_GBC;
 					state.input_trc = TRC_GAMMA;
 					state.input_gamma[0] = 
 					state.input_gamma[1] = 
@@ -1781,8 +1778,8 @@ static void preinit(int argc, char **argv)
 				} else if (strcmp(optarg, "gbi") == 0) {
 					state.profile = PROFILE_GBI;
 					if (state.profile_intent == INTENT_SATURATION)
-						state.matrix = MATRIX_IDENTITY;
-					else state.matrix = MATRIX_GBI;
+						state.input_matrix = MATRIX_IDENTITY;
+					else state.input_matrix = MATRIX_GBI;
 					state.input_trc = TRC_SMPTE240;
 					state.input_gamma[0] = 
 					state.input_gamma[1] = 
@@ -1800,9 +1797,9 @@ static void preinit(int argc, char **argv)
 				} else if (strcmp(optarg, "hicolour") == 0) {
 					state.profile = PROFILE_HICOLOUR;
 					if (state.profile_intent == INTENT_SATURATION)
-						state.matrix = MATRIX_IDENTITY;
-					else state.matrix = MATRIX_HICOLOUR;
-					state.input_trc = TRC_GAMMA;
+						state.input_matrix = MATRIX_IDENTITY;
+					else state.input_matrix = MATRIX_HICOLOUR;
+					state.input_trc = TRC_LINEAR;
 					state.input_gamma[0] = 
 					state.input_gamma[1] = 
 					state.input_gamma[2] = 1.;
@@ -1819,8 +1816,8 @@ static void preinit(int argc, char **argv)
 				} else if (strcmp(optarg, "higan") == 0) {
 					state.profile = PROFILE_HIGAN;
 					if (state.profile_intent == INTENT_SATURATION)
-						state.matrix = MATRIX_IDENTITY;
-					else state.matrix = MATRIX_HIGAN;
+						state.input_matrix = MATRIX_IDENTITY;
+					else state.input_matrix = MATRIX_HIGAN;
 					state.input_trc = TRC_GAMMA;
 					state.input_gamma[0] = 
 					state.input_gamma[1] = 
@@ -1839,9 +1836,9 @@ static void preinit(int argc, char **argv)
 					state.profile = PROFILE_NDS;
 
 					switch (state.profile_intent) {
-						case INTENT_SATURATION:            state.matrix = MATRIX_IDENTITY; break;
-						case INTENT_ABSOLUTE_COLORIMETRIC: state.matrix = MATRIX_NDS;      break;
-						default:                           state.matrix = MATRIX_NDS_D65;
+						case INTENT_SATURATION:            state.input_matrix = MATRIX_IDENTITY; break;
+						case INTENT_ABSOLUTE_COLORIMETRIC: state.input_matrix = MATRIX_NDS;      break;
+						default:                           state.input_matrix = MATRIX_NDS_D65;
 					}
 
 					state.input_trc = TRC_GAMMA;
@@ -1875,9 +1872,9 @@ static void preinit(int argc, char **argv)
 					state.profile = PROFILE_PALM;
 
 					switch (state.profile_intent) {
-						case INTENT_SATURATION:            state.matrix = MATRIX_IDENTITY; break;
-						case INTENT_ABSOLUTE_COLORIMETRIC: state.matrix = MATRIX_PALM;     break;
-						default:                           state.matrix = MATRIX_PALM_D65;
+						case INTENT_SATURATION:            state.input_matrix = MATRIX_IDENTITY; break;
+						case INTENT_ABSOLUTE_COLORIMETRIC: state.input_matrix = MATRIX_PALM;     break;
+						default:                           state.input_matrix = MATRIX_PALM_D65;
 					}
 
 					state.input_trc = TRC_GAMMA;
@@ -1911,9 +1908,9 @@ static void preinit(int argc, char **argv)
 					state.profile = PROFILE_PSP;
 
 					switch (state.profile_intent) {
-						case INTENT_SATURATION:            state.matrix = MATRIX_IDENTITY; break;
-						case INTENT_ABSOLUTE_COLORIMETRIC: state.matrix = MATRIX_PSP;      break;
-						default:                           state.matrix = MATRIX_PSP_D65;
+						case INTENT_SATURATION:            state.input_matrix = MATRIX_IDENTITY; break;
+						case INTENT_ABSOLUTE_COLORIMETRIC: state.input_matrix = MATRIX_PSP;      break;
+						default:                           state.input_matrix = MATRIX_PSP_D65;
 					}
 
 					state.input_trc = TRC_GAMMA;
@@ -1947,29 +1944,29 @@ static void preinit(int argc, char **argv)
 				break;
 			case OPT_MATRIX:
 				if (strcmp(optarg, "identity") == 0)
-					state.matrix = MATRIX_IDENTITY;
+					state.input_matrix = MATRIX_IDENTITY;
 				else if (strcmp(optarg, "gambatte") == 0)
-					state.matrix = MATRIX_GAMBATTE;
+					state.input_matrix = MATRIX_GAMBATTE;
 				else if (strcmp(optarg, "gba") == 0)
-					state.matrix = MATRIX_GBA;
+					state.input_matrix = MATRIX_GBA;
 				else if (strcmp(optarg, "gbasp") == 0)
-					state.matrix = MATRIX_GBASP_D65;
+					state.input_matrix = MATRIX_GBASP_D65;
 				else if (strcmp(optarg, "gbc") == 0)
-					state.matrix = MATRIX_GBC;
+					state.input_matrix = MATRIX_GBC;
 				else if (strcmp(optarg, "gbi") == 0)
-					state.matrix = MATRIX_GBI;
+					state.input_matrix = MATRIX_GBI;
 				else if (strcmp(optarg, "hicolour") == 0)
-					state.matrix = MATRIX_HICOLOUR;
+					state.input_matrix = MATRIX_HICOLOUR;
 				else if (strcmp(optarg, "higan") == 0)
-					state.matrix = MATRIX_HIGAN;
+					state.input_matrix = MATRIX_HIGAN;
 				else if (strcmp(optarg, "nds") == 0)
-					state.matrix = MATRIX_NDS_D65;
+					state.input_matrix = MATRIX_NDS_D65;
 				else if (strcmp(optarg, "palm") == 0)
-					state.matrix = MATRIX_PALM_D65;
+					state.input_matrix = MATRIX_PALM_D65;
 				else if (strcmp(optarg, "psp") == 0)
-					state.matrix = MATRIX_PSP_D65;
+					state.input_matrix = MATRIX_PSP_D65;
 				else if (strcmp(optarg, "vba") == 0)
-					state.matrix = MATRIX_VBA;
+					state.input_matrix = MATRIX_VBA;
 				break;
 			case OPT_INPUT_GAMMA:
 				switch (sscanf(optarg, "%g:%g:%g",

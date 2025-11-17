@@ -41,8 +41,10 @@ typedef struct {
 	struct {
 		int sd;
 		int nonblock;
-		struct sockaddr_in sin;
-		socklen_t sinlen;
+		union {
+			struct sockaddr sa;
+			struct sockaddr_in sin;
+		};
 	} sv;
 
 	struct timespec tv;

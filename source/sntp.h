@@ -16,8 +16,11 @@
 typedef struct {
 	struct {
 		int sd;
-		struct sockaddr_in sin;
-		socklen_t sinlen;
+		union {
+			struct sockaddr sa;
+			struct sockaddr_in sin;
+		};
+		struct timeval tv;
 	} sv;
 } sntp_state_t;
 

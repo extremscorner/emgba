@@ -183,5 +183,7 @@ static void *thread_func(void *arg)
 void GBAInit(void)
 {
 	LWP_InitQueue(&queue);
-	LWP_CreateThread(&thread, thread_func, NULL, NULL, 0, LWP_PRIO_NORMAL);
+
+	if (!LWP_CreateThread(&thread, thread_func, NULL, NULL, 0, LWP_PRIO_NORMAL))
+		LWP_DetachThread(thread);
 }

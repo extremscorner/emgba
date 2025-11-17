@@ -18,10 +18,10 @@ static syswd_t alarm = SYS_WD_NULL;
 ctr_state_t ctr = {
 	.sv.sd = INVALID_SOCKET,
 	.sv.nonblock = 1,
+
 	.sv.sin.sin_family = AF_INET,
 	.sv.sin.sin_port = 15708,
 	.sv.sin.sin_addr.s_addr = INADDR_ANY,
-	.sv.sinlen = sizeof(struct sockaddr),
 
 	.tv.tv_sec  = 1,
 	.tv.tv_nsec = 0,
@@ -93,7 +93,7 @@ bool CTRInit(void)
 		goto fail;
 	if (net_ioctl(ctr.sv.sd, FIONBIO, &ctr.sv.nonblock) < 0)
 		goto fail;
-	if (net_bind(ctr.sv.sd, (struct sockaddr *)&ctr.sv.sin, ctr.sv.sinlen) < 0)
+	if (net_bind(ctr.sv.sd, &ctr.sv.sa, sizeof(ctr.sv.sin)) < 0)
 		goto fail;
 
 	SYS_CreateAlarm(&alarm);

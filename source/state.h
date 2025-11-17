@@ -112,12 +112,13 @@ typedef struct {
 		MATRIX_MAX,
 		MATRIX_GBC = MATRIX_GBA,
 		MATRIX_HICOLOUR = MATRIX_VBA,
-	} matrix;
+	} input_matrix;
 
 	enum {
 		TRC_LINEAR = 0,
 		TRC_GAMMA,
 		TRC_PIECEWISE,
+		TRC_GAMMA22,
 		TRC_IEC61966,
 		TRC_ITU709,
 		TRC_SMPTE240,

@@ -40,7 +40,7 @@ int tcp_read_complete(int socket, void *buffer, int size)
 
 static void *thread_func(void *arg)
 {
-	network.inited = if_configex(&network.address, &network.gateway, &network.netmask, network.use_dhcp);
+	network.inited = if_configex(&network.address, &network.netmask, &network.gateway, network.use_dhcp);
 
 	if (network.inited < 0) {
 		network.disabled = true;
@@ -57,6 +57,9 @@ static void *thread_func(void *arg)
 void NetworkInit(void)
 {
 	if (network.disabled) return;
-	if (LWP_CreateThread(&thread, thread_func, NULL, NULL, 0, LWP_PRIO_NORMAL) < 0)
+
+	if (!LWP_CreateThread(&thread, thread_func, NULL, NULL, 0, LWP_PRIO_NORMAL))
+		LWP_DetachThread(thread);
+	else
 		network.disabled = true;
 }

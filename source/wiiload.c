@@ -31,13 +31,15 @@ static lwp_t thread = LWP_THREAD_NULL;
 
 wiiload_state_t wiiload = {
 	.sv.sd = INVALID_SOCKET,
+
 	.sv.sin.sin_family = AF_INET,
 	.sv.sin.sin_port = 4299,
 	.sv.sin.sin_addr.s_addr = INADDR_ANY,
-	.sv.sinlen = sizeof(struct sockaddr),
+
+	.sv.tv.tv_sec  = 1,
+	.sv.tv.tv_usec = 0,
 
 	.cl.sd = INVALID_SOCKET,
-	.cl.sinlen = sizeof(struct sockaddr)
 };
 
 static bool wiiload_read_file(int fd, int size)
@@ -65,7 +67,7 @@ static bool wiiload_read(int sd, int insize, int outsize)
 {
 	Byte inbuf[4096];
 	z_stream zstream = {0};
-	int ret, len = 0;
+	int ret, pos = 0;
 
 	void *buf = wiiload.task.buf;
 	wiiload.task.buf    = NULL;
@@ -81,10 +83,10 @@ static bool wiiload_read(int sd, int insize, int outsize)
 	zstream.next_out  = buf;
 	zstream.avail_out = outsize;
 
-	while (len < insize) {
-		ret = tcp_read(sd, inbuf, MIN(insize - len, sizeof(inbuf)), 1);
+	while (pos < insize) {
+		ret = tcp_read(sd, inbuf, MIN(insize - pos, sizeof(inbuf)), 1);
 		if (ret < 0) goto fail;
-		else len += ret;
+		else pos += ret;
 
 		zstream.next_in  = inbuf;
 		zstream.avail_in = ret;
@@ -94,13 +96,11 @@ static bool wiiload_read(int sd, int insize, int outsize)
 	}
 
 	inflateEnd(&zstream);
-
 	wiiload.task.buf = buf;
 	return true;
 
 fail:
 	inflateEnd(&zstream);
-
 	free(buf);
 	return false;
 }
@@ -219,7 +219,7 @@ static bool is_type_dol(void *buffer, int size)
 	return true;
 }
 
-static bool handle_conn(int sd)
+static bool wiiload_handler(int sd)
 {
 	wiiload_header_t header;
 
@@ -256,9 +256,9 @@ static void *thread_func(void *arg)
 {
 	wiiload.sv.sd = net_socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
 
-	if (wiiload.sv.sd == INVALID_SOCKET) 
+	if (wiiload.sv.sd == INVALID_SOCKET)
 		goto fail;
-	if (net_bind(wiiload.sv.sd, (struct sockaddr *)&wiiload.sv.sin, wiiload.sv.sinlen) < 0)
+	if (net_bind(wiiload.sv.sd, &wiiload.sv.sa, sizeof(wiiload.sv.sin)) < 0)
 		goto fail;
 	if (net_listen(wiiload.sv.sd, 0) < 0)
 		goto fail;
@@ -266,13 +266,9 @@ static void *thread_func(void *arg)
 	do {
 		#ifdef HW_DOL
 		fd_set readset;
-		struct timeval tv;
-
 		FD_ZERO(&readset);
 		FD_SET(wiiload.sv.sd, &readset);
-
-		tv.tv_sec = 1; tv.tv_usec = 0;
-		net_select(FD_SETSIZE, &readset, NULL, NULL, &tv);
+		net_select(FD_SETSIZE, &readset, NULL, NULL, &wiiload.sv.tv);
 
 		if (FD_ISSET(wiiload.sv.sd, &readset)) {
 		#else
@@ -281,10 +277,11 @@ static void *thread_func(void *arg)
 
 		if (psd.revents & POLLIN) {
 		#endif
-			wiiload.cl.sd = net_accept(wiiload.sv.sd, (struct sockaddr *)&wiiload.cl.sin, &wiiload.cl.sinlen);
+			socklen_t addrlen = sizeof(wiiload.cl.sin);
+			wiiload.cl.sd = net_accept(wiiload.sv.sd, &wiiload.cl.sa, &addrlen);
 
 			if (wiiload.cl.sd != INVALID_SOCKET) {
-				handle_conn(wiiload.cl.sd);
+				wiiload_handler(wiiload.cl.sd);
 				net_close(wiiload.cl.sd);
 				wiiload.cl.sd = INVALID_SOCKET;
 			}

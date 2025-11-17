@@ -52,8 +52,8 @@ void GXFontAllocState(void)
 {
 	Mtx44 projection;
 	guOrtho(projection,
-		-screen.y - screen.h / 2, screen.y + screen.h / 2,
-		-screen.x - screen.w / 2, screen.x + screen.w / 2, 0., 1.);
+		-screen.y - screen.h / 2., screen.y + screen.h / 2.,
+		-screen.x - screen.w / 2., screen.x + screen.w / 2., 0., 1.);
 
 	SYS_SetFontEncoding(SYS_FONTENC_ANSI);
 	fontdata = SYS_AllocArenaMemHi(SYS_FONTSIZE_ANSI, 32);

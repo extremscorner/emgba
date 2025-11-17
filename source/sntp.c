@@ -15,10 +15,13 @@ static lwp_t thread = LWP_THREAD_NULL;
 
 sntp_state_t sntp = {
 	.sv.sd = INVALID_SOCKET,
+
 	.sv.sin.sin_family = AF_INET,
 	.sv.sin.sin_port = 123,
 	.sv.sin.sin_addr.s_addr = INADDR_ANY,
-	.sv.sinlen = sizeof(struct sockaddr),
+
+	.sv.tv.tv_sec  = 1,
+	.sv.tv.tv_usec = 0,
 };
 
 extern uint32_t __SYS_SetRTC(uint32_t time);
@@ -39,21 +42,17 @@ static void *thread_func(void *arg)
 {
 	sntp.sv.sd = net_socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
 
-	if (sntp.sv.sd == INVALID_SOCKET) 
+	if (sntp.sv.sd == INVALID_SOCKET)
 		goto fail;
-	if (net_bind(sntp.sv.sd, (struct sockaddr *)&sntp.sv.sin, sntp.sv.sinlen) < 0)
+	if (net_bind(sntp.sv.sd, &sntp.sv.sa, sizeof(sntp.sv.sin)) < 0)
 		goto fail;
 
 	do {
 		#ifdef HW_DOL
 		fd_set readset;
-		struct timeval tv;
-
 		FD_ZERO(&readset);
 		FD_SET(sntp.sv.sd, &readset);
-
-		tv.tv_sec = 1; tv.tv_usec = 0;
-		net_select(FD_SETSIZE, &readset, NULL, NULL, &tv);
+		net_select(FD_SETSIZE, &readset, NULL, NULL, &sntp.sv.tv);
 
 		if (FD_ISSET(sntp.sv.sd, &readset))
 		#else
@@ -73,5 +72,6 @@ fail:
 
 void SNTPInit(void)
 {
-	LWP_CreateThread(&thread, thread_func, NULL, NULL, 0, LWP_PRIO_NORMAL);
+	if (!LWP_CreateThread(&thread, thread_func, NULL, NULL, 0, LWP_PRIO_NORMAL))
+		LWP_DetachThread(thread);
 }
